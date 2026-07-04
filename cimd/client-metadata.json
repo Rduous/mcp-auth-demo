@@ -1,0 +1,15 @@
+{
+  "client_id": "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json",
+  "client_name": "MCP Auth Demo CLI",
+  "client_uri": "https://github.com/Rduous/mcp-auth-demo",
+  "redirect_uris": [
+    "http://127.0.0.1/callback",
+    "http://localhost/callback"
+  ],
+  "token_endpoint_auth_method": "none",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "scope": "mcp:tools logs:read",
+  "application_type": "native",
+  "dpop_bound_access_tokens": false
+}

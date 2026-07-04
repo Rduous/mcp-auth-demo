@@ -8,7 +8,7 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 
 ## Open design questions (resolve before/during Phase 0)
 
-- [ ] **Which AS?** Must support CIMD, not just Dynamic Client Registration.
+- [x] **Which AS?** Shortlisted **Authlete** (top pick) and **WorkOS** (backup) — both SaaS, both claim shipped CIMD support with real engineering-level docs, unlike OSS options (e.g. Ory Hydra) where CIMD is still an open feature request. Provisional pending the Phase 0 spike below. See [NOTES.md](NOTES.md).
 - [ ] **Protected tool choice** — keep trivial (e.g. `echo`, `get_time`). Signal is scope enforcement, not tool logic.
 - [ ] **"Single command" CLI** — one-shot (browser pops mid-call) vs. `login` + `call` two-step?
 - [ ] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus.
