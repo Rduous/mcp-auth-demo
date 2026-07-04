@@ -26,6 +26,6 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - **Resource/audience enforcement is not automatic.** `/auth/introspection` returned identical `action:OK` whether `resources` matched, mismatched, or was omitted. A control test (bogus `scopes`) correctly triggered `FORBIDDEN`, proving the request mechanism works — the gap is specific to resource matching. Decision: our own MCP server must check `accessTokenResources` itself rather than trust Authlete to reject cross-audience tokens.
 - Initially misread a `"responseContent":"Bearer error=\"invalid_request\""` string as a real error — it's a fixed placeholder Authlete always returns when `action:OK` (confirmed in `IntrospectionResponse` docs), not a computed error. `action` is the field that matters. Doesn't change the finding above, but flagging the correction since it was a plausible misread.
 
-## Open items
+## 2026-07-04 — PKCE now enforced
 
-- [ ] Find/set `pkceRequired` (+ `pkceS256Required`) on the Authlete service — not visible under the console's CIMD/Metadata section, still hunting for the right settings tab.
+- Setting was under the console's **Authorization** tab, not Metadata/CIMD. Enabled Require PKCE + Require S256. Verified: a request without `code_challenge` is now rejected (`A124301`). Phase 0 checklist is now fully closed.
