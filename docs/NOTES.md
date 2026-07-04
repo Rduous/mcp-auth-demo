@@ -73,3 +73,7 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - Replaced the "paste the callback URL" step with a real local `http.server.HTTPServer` on an OS-assigned ephemeral port, run in a background thread via `asyncio.to_thread`. Sends the redirect_uri with that real port to the AS.
 - This exercised the last untested Phase 3 item: our CIMD doc only registers a *portless* redirect URI, so this only works if Authlete matches ignoring the port for loopback addresses (RFC 8252 §7.3). Confirmed it does — worked on the first try, fully automatic end to end.
 - Phase 3 and the "single command CLI" open question are both now genuinely resolved: one `python3 client/main.py` invocation does discovery, CIMD, PKCE, the loopback catch, and the tool call, with no manual steps.
+
+## 2026-07-04 — Phase 4 done: audience rejection proven, not just assumed
+
+- Minted a real token bound to a deliberately wrong resource (`https://wrong-server.example/resource`, confirmed in both `aud` and `accessTokenResources`), then called our actual running MCP server with it: `401`. The same server previously returned `200` for a correctly-bound token. That's the real proof our own resource-server-side check works, not just a matching-case success.
