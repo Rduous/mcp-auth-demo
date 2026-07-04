@@ -77,3 +77,8 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 ## 2026-07-04 — Phase 4 done: audience rejection proven, not just assumed
 
 - Minted a real token bound to a deliberately wrong resource (`https://wrong-server.example/resource`, confirmed in both `aud` and `accessTokenResources`), then called our actual running MCP server with it: `401`. The same server previously returned `200` for a correctly-bound token. That's the real proof our own resource-server-side check works, not just a matching-case success.
+
+## 2026-07-04 — AS-frontend: interactive consent picker
+
+- Replaced the silent auto-approve in `authserver`'s `/authorize` with a real (if minimal) consent screen: three links ("mcp:tools", "logs:read", "no scope"), each issuing the code with exactly that scope via `/authorize/confirm`. Identity is still a no-op (one hardcoded subject) — only scope *consent* is now an actual interactive choice.
+- Side benefit: this doubles as a manual test harness for Phase 5/6 — trivial to mint tokens with different scope outcomes without touching curl each time.
