@@ -1,5 +1,4 @@
-flask
+mcp[cli]
 httpx
-authlib
 pyjwt
 click

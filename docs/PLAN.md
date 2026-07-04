@@ -29,9 +29,9 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 
 ## Phase 1 — Trivial unauthenticated loop
 
-- [ ] Basic MCP server, one tool, no auth
-- [ ] Basic MCP client that calls it
-- [ ] Confirm base transport/plumbing works end to end
+- [x] Basic MCP server, one tool (`get_time`), no auth — [server/main.py](../server/main.py), official `mcp` SDK (`FastMCP`, streamable-http)
+- [x] Basic MCP client that calls it — [client/main.py](../client/main.py)
+- [x] Confirm base transport/plumbing works end to end — ran both locally, client got a real timestamp back
 
 ---
 
