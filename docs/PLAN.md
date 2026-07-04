@@ -76,6 +76,18 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ---
 
+## Phase 7 — Deploy to AWS (nice-to-have, not required by the assignment)
+
+Sequenced after Phase 6, not before: deployment is portfolio/interview value, not graded, and doing it after the second tool exists avoids redeploying infra once `logs:read` shows up.
+
+- [ ] Settle the MCP server's real public HTTPS canonical resource URI (must stay fixed — everything in Phase 4 is keyed off it)
+- [ ] Move the Authlete Service Access Token into a real secret store (AWS Secrets Manager / SSM), not an env file
+- [ ] Containerize the server; bind to `0.0.0.0`, add a health-check endpoint for k8s probes
+- [ ] Terraform for AWS infra; k8s manifests for the deployment
+- [ ] TLS termination (ALB/ingress + cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
+
+---
+
 ## Wrong-turn / correction log
 *(add entries as they happen — a dozen sharp ones beats fifty verbose ones)*
 
