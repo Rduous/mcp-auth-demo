@@ -82,3 +82,11 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 
 - Replaced the silent auto-approve in `authserver`'s `/authorize` with a real (if minimal) consent screen: three links ("mcp:tools", "logs:read", "no scope"), each issuing the code with exactly that scope via `/authorize/confirm`. Identity is still a no-op (one hardcoded subject) — only scope *consent* is now an actual interactive choice.
 - Side benefit: this doubles as a manual test harness for Phase 5/6 — trivial to mint tokens with different scope outcomes without touching curl each time.
+
+## 2026-07-04 — Design decision: per-tool scope enforcement via custom middleware, not separate servers
+
+*(write-up material — good "design decision + tradeoff + why" candidate)*
+
+- MCP's client-server relationship is 1:1 per session; multiplicity (a host juggling several servers) lives one layer up, in the host application. Given the assignment's wording — "an MCP server... enforces scopes on at least one protected tool," "point at your server... call your protected MCP tool" — the intended shape is one server, several tools, at least one scope-gated, not multiple servers split by permission tier.
+- Modeled our expected real-world deployment accordingly: a Claude-based agent (the host) running on a user's laptop, our CLI (the client) installed locally, and our MCP server hosted remotely — a single client-server session, matching how a real user would actually run this.
+- Chose custom middleware that inspects each `tools/call` request and checks that specific tool's required scope, over splitting scope tiers across separate FastMCP mounts, so the step-up story (call a tool, get `403`, re-authenticate narrowly for just that scope, retry) stays within one continuous session rather than requiring a second connection to a differently-scoped server.
