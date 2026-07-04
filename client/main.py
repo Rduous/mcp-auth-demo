@@ -1,3 +1,6 @@
+# TODO: this is a throwaway script for Phase 1's plumbing check. Once we
+# settle the CLI shape (one-shot vs. login+call), rewrite this as a proper
+# CLI tool (click) that handles auth, not just a hardcoded tool call.
 import asyncio
 
 from mcp import ClientSession
