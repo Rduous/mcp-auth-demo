@@ -17,7 +17,7 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 
 ## Phase 0 — De-risk the AS choice (no app code)
 
-- [ ] Host a CIMD doc at a public HTTPS URL (GitHub Pages / gist-style is fine)
+- [x] Host a CIMD doc at a public HTTPS URL (GitHub Pages / gist-style is fine) — live at https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json
 - [ ] Manually drive full auth-code + PKCE flow via curl/Postman against candidate AS
 - [ ] Confirm AS fetches & validates the CIMD doc
 - [ ] Confirm AS enforces PKCE
