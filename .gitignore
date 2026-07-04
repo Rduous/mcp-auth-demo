@@ -6,3 +6,4 @@ credentials.json
 *.token
 .DS_Store
 .claude/
+private_notes/
