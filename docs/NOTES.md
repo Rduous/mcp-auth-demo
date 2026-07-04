@@ -47,3 +47,10 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - `server/auth.py`: `AuthleteTokenVerifier` calls Authlete's `/auth/introspection`, then separately checks our own `RESOURCE_URI` is in `accessTokenResources` — the audience check Authlete won't do for us (Phase 0 finding).
 - Confirmed both paths live: no token → `401` + correct PRM naming Authlete; valid, correctly-audience-bound token → `200` + real tool result.
 - One false alarm mid-debug: a test looked like it failed due to a bad token, but it was the chat UI auto-masking a long JWT-looking string on display — not a code bug. Worth remembering before assuming a real failure next time this pattern shows up.
+
+## 2026-07-04 — Authlete is backend-API-only; staying anyway, building an AS-frontend
+
+- Real finding, not a bug: `authlete.com/.well-known/openid-configuration` 404s. Authlete has no hosted login/consent UI or live `/authorize`/`/token` endpoints — it's a backend API a real AS-frontend is expected to call. That's exactly why Phase 0 simulated the AS side by hand with curl; it doesn't generalize to a real browser flow.
+- Checked WorkOS as the alternative: its AuthKit *does* host real login/consent pages plus live OAuth endpoints, and has a native CIMD toggle. It remains a viable fallback if Authlete becomes a blocker, but we're not switching — we already have validated work on Authlete (introspection wiring, JWT signing) and the missing piece (a thin AS-frontend wrapping 3 already-curl-tested API calls) is small.
+- Decision: stay on Authlete, stand up our own minimal AS-frontend (`/authorize`, `/token`, `/.well-known/oauth-authorization-server`). Sign-in will be a **no-op** — auto-approve a single hardcoded demo subject, no real login form. Marked with a TODO in the AS-frontend code once built.
+- Added a future refinement (not required by the assignment): swap the no-op sign-in for real Google SSO, with the allowed-subjects check enforced in the **MCP resource server** (same layer as our existing audience check), not the AS-frontend.

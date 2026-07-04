@@ -37,15 +37,16 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 2 — Add 401 + Protected Resource Metadata
 
-- [ ] Pick a placeholder canonical resource URI for local dev (single config value, not hardcoded in multiple places) — this is the value every later phase reuses, until Phase 7 swaps it for a real public hostname
-- [ ] Server requires a token, returns `401` + PRM pointing at real AS
+- [x] Pick a placeholder canonical resource URI for local dev — `http://127.0.0.1:8000/mcp`, in [server/auth.py](../server/auth.py) as `RESOURCE_URI`, not hardcoded elsewhere
+- [x] Server requires a token, returns `401` + PRM pointing at real AS — verified via curl: `401` + `www-authenticate` → `.well-known/oauth-protected-resource/mcp` → names `https://authlete.com/`
 - [ ] Client discovers AS from the `401` response (not hardcoded) — **this is graded**
-- [ ] **Checkpoint:** decide token verification path — call Authlete's `/auth/introspection` (network hop, live revocation check) vs. verify the JWT locally via JWKS (no network call, but revoked/logged-out tokens stay valid until `exp`). See [session_log.md](session_log.md).
+- [x] **Checkpoint:** decided — call Authlete's `/auth/introspection` (network hop, live revocation check). See [server/auth.py](../server/auth.py) and [session_log.md](session_log.md).
 
 ---
 
 ## Phase 3 — Full auth handshake
 
+- [ ] Stand up a thin AS-frontend wrapping Authlete's API — `/authorize`, `/token`, `/.well-known/oauth-authorization-server`. Required because Authlete has no hosted login/consent UI (confirmed: it 404s at the well-known endpoint) — see [NOTES.md](NOTES.md). Sign-in is a **no-op** (auto-approve one demo subject) — TODO in code, real identity is a later refinement (Phase 8).
 - [ ] Client does CIMD-based `client_id` + PKCE against real AS
 - [ ] Client obtains token, calls tool with `Authorization: Bearer`
 - [ ] Loopback redirect URI handles random local port correctly
@@ -86,6 +87,14 @@ Sequenced after Phase 6, not before: deployment is portfolio/interview value, no
 - [ ] Containerize the server; bind to `0.0.0.0`, add a health-check endpoint for k8s probes
 - [ ] Terraform for AWS infra; k8s manifests for the deployment
 - [ ] TLS termination (ALB/ingress + cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
+
+---
+
+## Phase 8 — Real sign-in: Google SSO + allow-list (nice-to-have, refines Phase 3's no-op)
+
+- [ ] AS-frontend's `/authorize` becomes a Google OAuth client itself — redirect to Google, get a verified email back, use it as the `subject` passed to Authlete instead of the hardcoded demo value
+- [ ] Allow-list of permitted Google emails enforced in the **MCP resource server** (check `subject` from introspection, same layer as our existing audience check) — not just at the AS-frontend
+- [ ] Optional: also reject at the AS-frontend for better UX (fail before issuing a code at all), in addition to the resource-server check
 
 ---
 
