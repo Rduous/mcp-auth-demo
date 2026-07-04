@@ -67,3 +67,9 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - Debugging note: hit a real bug (env vars exported in one terminal, `authserver` started in another — `AUTHLETE_SERVICE_ID` empty, produced `api//auth/authorization`, a 400 from Authlete) vs. an expected non-bug (browser `ERR_CONNECTION_REFUSED` on the callback URL — nothing listens on plain port 80 by design; the URL itself, copy-pasted back, is all the client needs).
 - First fully real run (not curl-simulated) succeeded end to end: `client/main.py`'s `OAuthClientProvider` discovered the AS via `401`+PRM, did CIMD + PKCE against our AS-frontend, got a token, and `get_time` returned a real timestamp through our server's introspection-based validation.
 - Not yet tested: real ephemeral-port loopback redirect handling — current client uses a fixed no-port `redirect_uri` and manual copy-paste of the callback URL. Deferred to the hand-rolled client rewrite (the "option 1" version), which is next.
+
+## 2026-07-04 — Real loopback callback server, no more manual paste-back
+
+- Replaced the "paste the callback URL" step with a real local `http.server.HTTPServer` on an OS-assigned ephemeral port, run in a background thread via `asyncio.to_thread`. Sends the redirect_uri with that real port to the AS.
+- This exercised the last untested Phase 3 item: our CIMD doc only registers a *portless* redirect URI, so this only works if Authlete matches ignoring the port for loopback addresses (RFC 8252 §7.3). Confirmed it does — worked on the first try, fully automatic end to end.
+- Phase 3 and the "single command CLI" open question are both now genuinely resolved: one `python3 client/main.py` invocation does discovery, CIMD, PKCE, the loopback catch, and the tool call, with no manual steps.

@@ -10,7 +10,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 - [x] **Which AS?** Shortlisted **Authlete** (top pick) and **WorkOS** (backup) — both SaaS, both claim shipped CIMD support with real engineering-level docs, unlike OSS options (e.g. Ory Hydra) where CIMD is still an open feature request. Provisional pending the Phase 0 spike below. See [NOTES.md](NOTES.md).
 - [x] **Protected tool choice** — `get_time` (no args). Will need a second tool (`logs:read`-gated, per Phase 6) to actually demonstrate scope *differentiation* — one tool alone can only show authenticated-vs-not, not that different scopes unlock different things.
-- [ ] **"Single command" CLI** — one-shot (browser pops mid-call) vs. `login` + `call` two-step?
+- [x] **"Single command" CLI** — one-shot. `python3 client/main.py` does everything: discovers the AS, opens the browser, catches the redirect on a real ephemeral-port loopback server, exchanges the code, calls the tool. No separate `login` step, no manual paste-back.
 - [ ] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus.
 
 ---
@@ -49,7 +49,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] Stand up a thin AS-frontend wrapping Authlete's API — `/authorize`, `/token`, `/.well-known/oauth-authorization-server`. Required because Authlete has no hosted login/consent UI (confirmed: it 404s at the well-known endpoint) — see [NOTES.md](NOTES.md). Sign-in is a **no-op** (auto-approve one demo subject) — TODO in code, real identity is a later refinement (Phase 8). Live at `authserver/main.py`.
 - [x] Client does CIMD-based `client_id` + PKCE against real AS — confirmed end-to-end using the SDK's `OAuthClientProvider` + `client_metadata_url` (the "library shortcut" / option 2 path)
 - [x] Client obtains token, calls tool with `Authorization: Bearer` — confirmed, real `get_time` result returned through the full chain
-- [ ] Loopback redirect URI handles random local port correctly — **not yet tested**. Current callback handling is a fixed no-port `redirect_uri` + manual paste-the-URL-back step. Real ephemeral-port handling is deferred to the hand-rolled reimplementation (option 1) — next up.
+- [x] Loopback redirect URI handles random local port correctly — real local HTTP server on an OS-assigned port, no manual paste-back. Confirmed Authlete matches the port-bearing `redirect_uri` against our CIMD doc's portless registration (RFC 8252 §7.3 loopback exception), fully automatic end to end.
 
 ---
 
