@@ -37,6 +37,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 2 — Add 401 + Protected Resource Metadata
 
+- [ ] Pick a placeholder canonical resource URI for local dev (single config value, not hardcoded in multiple places) — this is the value every later phase reuses, until Phase 7 swaps it for a real public hostname
 - [ ] Server requires a token, returns `401` + PRM pointing at real AS
 - [ ] Client discovers AS from the `401` response (not hardcoded) — **this is graded**
 - [ ] **Checkpoint:** decide token verification path — call Authlete's `/auth/introspection` (network hop, live revocation check) vs. verify the JWT locally via JWKS (no network call, but revoked/logged-out tokens stay valid until `exp`). See [session_log.md](session_log.md).
@@ -53,7 +54,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 4 — Resource parameter / audience binding
 
-- [ ] Settle the MCP server's canonical resource URI — same value used here, in Phase 2's PRM, and in Phase 3's `resource` param
+- [ ] Reuse the Phase 2 placeholder resource URI here and in Phase 3's `resource` param — not a new decision, just confirming it's read from the one config value everywhere
 - [ ] Server checks `aud` itself on every request (Authlete's introspection won't reject a mismatched resource for us — confirmed in Phase 0)
 - [ ] Negative test: a token issued for a different resource must be rejected by our server (`401 invalid_token`) — this is the real proof, not just a matching-case success
 
@@ -80,7 +81,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 Sequenced after Phase 6, not before: deployment is portfolio/interview value, not graded, and doing it after the second tool exists avoids redeploying infra once `logs:read` shows up.
 
-- [ ] Settle the MCP server's real public HTTPS canonical resource URI (must stay fixed — everything in Phase 4 is keyed off it)
+- [ ] Swap the Phase 2 placeholder for the real public HTTPS canonical resource URI (needs a real domain/DNS/TLS to exist first — this is the one point where the value actually changes)
 - [ ] Move the Authlete Service Access Token into a real secret store (AWS Secrets Manager / SSM), not an env file
 - [ ] Containerize the server; bind to `0.0.0.0`, add a health-check endpoint for k8s probes
 - [ ] Terraform for AWS infra; k8s manifests for the deployment
