@@ -11,7 +11,7 @@ mcp = FastMCP(
     json_response=True,
     token_verifier=AuthleteTokenVerifier(),
     auth=AuthSettings(
-        issuer_url="https://authlete.com",
+        issuer_url="http://127.0.0.1:8001",
         resource_server_url=RESOURCE_URI,
     ),
 )

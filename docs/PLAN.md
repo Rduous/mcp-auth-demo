@@ -46,10 +46,10 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 3 — Full auth handshake
 
-- [ ] Stand up a thin AS-frontend wrapping Authlete's API — `/authorize`, `/token`, `/.well-known/oauth-authorization-server`. Required because Authlete has no hosted login/consent UI (confirmed: it 404s at the well-known endpoint) — see [NOTES.md](NOTES.md). Sign-in is a **no-op** (auto-approve one demo subject) — TODO in code, real identity is a later refinement (Phase 8).
-- [ ] Client does CIMD-based `client_id` + PKCE against real AS
-- [ ] Client obtains token, calls tool with `Authorization: Bearer`
-- [ ] Loopback redirect URI handles random local port correctly
+- [x] Stand up a thin AS-frontend wrapping Authlete's API — `/authorize`, `/token`, `/.well-known/oauth-authorization-server`. Required because Authlete has no hosted login/consent UI (confirmed: it 404s at the well-known endpoint) — see [NOTES.md](NOTES.md). Sign-in is a **no-op** (auto-approve one demo subject) — TODO in code, real identity is a later refinement (Phase 8). Live at `authserver/main.py`.
+- [x] Client does CIMD-based `client_id` + PKCE against real AS — confirmed end-to-end using the SDK's `OAuthClientProvider` + `client_metadata_url` (the "library shortcut" / option 2 path)
+- [x] Client obtains token, calls tool with `Authorization: Bearer` — confirmed, real `get_time` result returned through the full chain
+- [ ] Loopback redirect URI handles random local port correctly — **not yet tested**. Current callback handling is a fixed no-port `redirect_uri` + manual paste-the-URL-back step. Real ephemeral-port handling is deferred to the hand-rolled reimplementation (option 1) — next up.
 
 ---
 
