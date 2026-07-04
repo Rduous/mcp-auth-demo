@@ -102,7 +102,10 @@ Sequenced after Phase 6, not before: deployment is portfolio/interview value, no
 ## Wrong-turn / correction log
 *(add entries as they happen — a dozen sharp ones beats fifty verbose ones)*
 
--
+- Assumed "SaaS AS" meant fully hosted, turnkey, like Auth0 — Authlete turned out to be backend-API-only (no live `/authorize`, confirmed via 404 at its well-known endpoint), requiring us to build our own thin AS-frontend. Not wrong to pick Authlete, but wrong to assume the SaaS category was uniform.
+- Concluded "Authlete's introspection doesn't enforce resource/audience matching" — actually a confounded test. Every token we'd minted had `scope: null` because `mcp:tools`/`logs:read` were never pre-registered at the service level (a real, non-obvious config step). With `sufficient` unconditionally `false` from scope-insufficiency alone, we couldn't see whether resources mattered at all. Root-caused and re-verified: the check is real, and combined with scope.
+- Misread a fixed placeholder string (`responseContent: "Bearer error=\"invalid_request\""`, always present when `action:OK`) as a real error on a successful introspection call. `action` is the field that matters; `responseContent` only carries real content on non-OK actions.
+- Three failed token mints in a row before realizing scopes need explicit pre-registration in the console (Tokens and Claims > Advanced > Scope) — passing `"scopes": [...]` to `/auth/authorization/issue` silently no-ops if the scope isn't recognized, rather than erroring.
 
 ## Time-cost observations
 *(e.g. % effort on auth plumbing vs. tool logic)*
