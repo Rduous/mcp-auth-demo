@@ -56,8 +56,9 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 ## Phase 4 — Resource parameter / audience binding
 
 - [ ] Reuse the Phase 2 placeholder resource URI here and in Phase 3's `resource` param — not a new decision, just confirming it's read from the one config value everywhere
-- [ ] Server checks `aud` itself on every request (Authlete's introspection won't reject a mismatched resource for us — confirmed in Phase 0)
+- [ ] Server checks `aud`/resource itself on every request regardless of Authlete's own check (see corrected finding in [NOTES.md](NOTES.md)) — defense-in-depth, not the only line of defense
 - [ ] Negative test: a token issued for a different resource must be rejected by our server (`401 invalid_token`) — this is the real proof, not just a matching-case success
+- [ ] Once Phase 5 adds a per-tool required scope, also pass it as `scopes` alongside `resources` in the introspection call — Authlete's combined scope+resource check then genuinely enforces both natively
 
 ---
 
