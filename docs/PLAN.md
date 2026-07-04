@@ -21,8 +21,8 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 - [x] Manually drive full auth-code + PKCE flow via curl/Postman against candidate AS — done against Authlete, see [NOTES.md](NOTES.md)
 - [x] Confirm AS fetches & validates the CIMD doc — confirmed twice: discovery shows `client_id_metadata_document_supported: true`, and the live authorization response showed `metadataDocumentUsed:true` / `clientSource:METADATA_DOCUMENT`
 - [x] Confirm AS enforces PKCE — enabled Require PKCE + Require S256 in console's Authorization tab; a request without `code_challenge` is now rejected (`A124301`)
-- [x] Confirm `resource` parameter is accepted — accepted and round-tripped into `accessTokenResources` on both the token and introspection responses. Access tokens are **opaque** (not JWT), so there's no `aud` claim to inspect directly.
-- [ ] **Open risk, not yet resolved:** Authlete's `/auth/introspection` does not itself reject a token when queried with a mismatched `resources` value (tested and confirmed via a scope-check control — the mechanism for extra introspection params works in general, just not for resource matching). Decision: our MCP resource server must do this comparison itself against `accessTokenResources` rather than relying on Authlete to enforce it. Not a blocker for staying on Authlete, but changes what Phase 4 needs to build.
+- [x] Confirm `resource` parameter is accepted — switched service to JWT access tokens (ES256); decoded token's `aud` claim is exactly `["https://rduous.github.io/mcp-auth-demo/resource"]`. See [NOTES.md](NOTES.md).
+- [x] **Resource enforcement isn't automatic on Authlete's side** — `/auth/introspection` doesn't reject a mismatched `resources` value (confirmed via a scope-check control, which does correctly reject). Our MCP resource server must check `aud`/`accessTokenResources` itself. Doesn't block staying on Authlete; changes what Phase 4 builds (see below).
 - [ ] **Decision point:** if any of the above fail, switch AS now — resolved: staying on Authlete. CIMD and resource-acceptance are solid; PKCE enforcement is a config fix, and audience checking will be handled in our own server code either way.
 
 ---
@@ -52,8 +52,9 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 
 ## Phase 4 — Resource parameter / audience binding
 
-- [ ] Inspect issued token, confirm `aud` claim = MCP server's canonical URI
-- [ ] Don't just eyeball success — this silently "works" even when wrong in single-server demos
+- [ ] Settle the MCP server's canonical resource URI — same value used here, in Phase 2's PRM, and in Phase 3's `resource` param
+- [ ] Server checks `aud` itself on every request (Authlete's introspection won't reject a mismatched resource for us — confirmed in Phase 0)
+- [ ] Negative test: a token issued for a different resource must be rejected by our server (`401 invalid_token`) — this is the real proof, not just a matching-case success
 
 ---
 
