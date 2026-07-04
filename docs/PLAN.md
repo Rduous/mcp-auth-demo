@@ -39,6 +39,7 @@ Stack: Python (Flask for the resource server, httpx for HTTP calls, authlib/pyjw
 
 - [ ] Server requires a token, returns `401` + PRM pointing at real AS
 - [ ] Client discovers AS from the `401` response (not hardcoded) — **this is graded**
+- [ ] **Checkpoint:** decide token verification path — call Authlete's `/auth/introspection` (network hop, live revocation check) vs. verify the JWT locally via JWKS (no network call, but revoked/logged-out tokens stay valid until `exp`). See [session_log.md](session_log.md).
 
 ---
 
