@@ -18,3 +18,7 @@ Format per entry: `## YYYY-MM-DD — short title`, then a couple of sentences on
 - Evaluated SaaS candidates on concrete signals of shipped, tested CIMD support (not marketing prose): versioned/opt-in feature flags, dev-mode metadata re-fetch controls, depth of security-mechanics documentation (self-reference validation, redirect URI matching), MCP-specific (not generic OAuth) framing.
 - Shortlisted **Authlete** (CIMD as an explicit versioned, opt-in service flag with a documented forced-refetch mechanism for dev — reads as a shipped, testable feature) and **WorkOS** (close second; deepest write-up on CIMD security mechanics, MCP-aware docs).
 - Both picks are **provisional pending the Phase 0 spike** — documentation depth is a proxy for implementation quality, not a substitute for actually driving a PKCE + CIMD flow via curl against each.
+
+## 2026-07-04 — Skipped Authlete's FAPI Profile toggle
+
+- Authlete's service-creation flow surfaces a "FAPI Profile" toggle (enables FAPI 1.0/2.0 settings). Left it disabled: FAPI is a banking-grade profile that typically mandates PAR, signed request objects, and mTLS/DPoP sender-constrained tokens, and generally disallows the plain public-client (`token_endpoint_auth_method: none`) pattern our CIMD client relies on. None of that is part of the MCP auth spec — enabling it would add failure modes unrelated to what's actually being built/graded. Flagged as a "more security settings ≠ better fit" trap worth calling out in the write-up.
