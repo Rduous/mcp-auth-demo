@@ -79,18 +79,20 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ---
 
-## Phase 7 — Deploy to AWS (nice-to-have, not required by the assignment)
+## Phase 7 — Containerize + host both services (Docker + Render)
 
-Sequenced after Phase 6, not before: deployment is portfolio/interview value, not graded, and doing it after the second tool exists avoids redeploying infra once `logs:read` shows up.
+Re-scoped from the original "deploy to AWS" plan once we worked out what grading actually requires: graders need to reach `server`/`authserver` asynchronously, without me present — they never run those two themselves (only `client/main.py`, which holds no secret). That's satisfiable for free with Docker + Render, no AWS/Terraform needed. This phase is now the one that actually unblocks async grading, not pure portfolio value — see Phase 9 for where the AWS/Terraform work went.
 
-Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE7_PLAN.md](PHASE7_PLAN.md). Decided: **ECS Fargate**, not EKS/k8s — supersedes the "k8s manifests" wording below.
+Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, pair-coding dev loop): [PHASE7_PLAN.md](PHASE7_PLAN.md).
 
-- [ ] Swap the Phase 2 placeholder for the real public HTTPS canonical resource URI (needs a real domain/DNS/TLS to exist first — this is the one point where the value actually changes)
-- [ ] Also swap `authserver`'s `ISSUER` constant for its own real public HTTPS URL — two services to deploy, not one; see PHASE7_PLAN.md
-- [ ] Move the Authlete Service Access Token into a real secret store (SSM Parameter Store, `SecureString`), not an env file
-- [ ] Containerize both services; bind to `0.0.0.0`, add a health-check endpoint for ALB target group probes
-- [ ] Terraform for AWS infra: ECS Fargate cluster/services (not k8s), ECR, one shared ALB with host-header routing
-- [ ] TLS termination (ALB + ACM cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
+- [ ] Add `/healthz` to both `server/main.py` and `authserver/main.py`, bind both to `0.0.0.0`
+- [ ] Make `RESOURCE_URI` (`server/auth.py`) and `ISSUER` (`authserver/main.py`) read from env vars instead of hardcoded `127.0.0.1` constants
+- [ ] Write a `Dockerfile` per service (shared root-level `requirements.txt`, so build context stays repo root, `dockerfilePath` points into the subdir)
+- [ ] Verify both containers locally via `docker compose up` before touching Render
+- [ ] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo
+- [ ] Point `RESOURCE_URI`/`ISSUER` env vars at the real `*.onrender.com` hostnames Render assigns
+- [ ] Smoke test end to end against the real URLs (same 401+PRM curl check as Phase 2, then a full `client/main.py` run) — watch for the free tier's ~1 min cold-start on first hit after idle
+- [ ] Note the cold-start caveat in the write-up in case a grader's client has a short timeout
 
 ---
 
@@ -99,6 +101,21 @@ Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE7
 - [ ] AS-frontend's `/authorize` becomes a Google OAuth client itself — redirect to Google, get a verified email back, use it as the `subject` passed to Authlete instead of the hardcoded demo value
 - [ ] Allow-list of permitted Google emails enforced in the **MCP resource server** (check `subject` from introspection, same layer as our existing audience check) — not just at the AS-frontend
 - [ ] Optional: also reject at the AS-frontend for better UX (fail before issuing a code at all), in addition to the resource-server check
+
+---
+
+## Phase 9 — Migrate to AWS/Terraform (optional, portfolio/interview value only — not required for grading)
+
+Phase 7 (Render) already satisfies the actual grading requirement for free. This phase is purely "show real AWS/Terraform skill" for the follow-up interview — do it only if there's time and interest left over.
+
+Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE9_AWS_PLAN.md](PHASE9_AWS_PLAN.md). Decided: **ECS Fargate**, not EKS/k8s.
+
+- [ ] Register a real domain (Route 53) — the one thing that changes vs. Render's free `*.onrender.com` hostnames
+- [ ] Move the Authlete Service Access Token into SSM Parameter Store (`SecureString`), not an env file
+- [ ] Reuse the Phase 7 Dockerfiles/health-check endpoints as-is — no rework needed there
+- [ ] Terraform for AWS infra: ECS Fargate cluster/services, ECR, one shared ALB with host-header routing
+- [ ] TLS termination (ALB + ACM cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
+- [ ] For fast local iteration on the Terraform itself during pair-coding, consider LocalStack's free Hobby plan (Terraform-compatible AWS emulator) instead of applying against a real account every time
 
 ---
 
