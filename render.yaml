@@ -11,6 +11,14 @@ services:
     dockerContext: .
     dockerfilePath: ./server/Dockerfile
     healthCheckPath: /healthz
+    # Only redeploy on changes that actually affect this service -- keeps
+    # unrelated docs/client/authserver-only commits on main from triggering
+    # a rebuild. Paths are always repo-root-relative regardless of
+    # dockerContext (Render's own behavior, not specific to this repo).
+    buildFilter:
+      paths:
+        - server/**
+        - requirements.txt
     envVars:
       - key: AUTHLETE_SERVICE_ID
         sync: false
@@ -27,6 +35,10 @@ services:
     dockerContext: .
     dockerfilePath: ./authserver/Dockerfile
     healthCheckPath: /healthz
+    buildFilter:
+      paths:
+        - authserver/**
+        - requirements.txt
     envVars:
       - key: AUTHLETE_SERVICE_ID
         sync: false
