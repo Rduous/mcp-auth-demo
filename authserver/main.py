@@ -3,6 +3,7 @@ import os
 from urllib.parse import parse_qsl, urlencode
 
 import httpx
+import jwt
 import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
@@ -176,6 +177,21 @@ async def revoke(request):
     """
     form = dict(await request.form())
     client_id = form.pop("client_id", None)
+
+    # Our access tokens are JWTs (see NOTES.md), and Authlete's
+    # /auth/revocation needs the token's *jti* claim for those, not the raw
+    # JWT string -- confirmed via their docs. A real RFC 7009 client only
+    # knows the actual access_token it was issued, so decode it here
+    # rather than leaking this Authlete-specific quirk into the client.
+    # No signature verification needed -- we're only reading a claim to
+    # look the token up; Authlete's own API is what actually validates it.
+    if "token" in form:
+        try:
+            claims = jwt.decode(form["token"], options={"verify_signature": False})
+            form["token"] = claims.get("jti", form["token"])
+        except jwt.DecodeError:
+            pass  # not a JWT -- fall back to the raw value as given
+
     print(f"[authserver] DEBUG /revoke form={form!r} client_id={client_id!r}")
 
     revoke_result = await authlete_post(
