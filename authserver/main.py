@@ -1,6 +1,6 @@
 import json
 import os
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode
 
 import httpx
 import uvicorn
@@ -27,8 +27,20 @@ DEMO_SUBJECT = "demo-user"
 SCOPE_CHOICES = {
     "Sign in with mcp:tools scope": "mcp:tools",
     "Sign in with logs:read scope": "logs:read",
-    "Sign in with no scope": "",
+    # NOTE: Authlete's /auth/authorization/issue ignores an *empty* scopes
+    # array override (falls back to the originally-requested scope --
+    # contradicts its own docs, confirmed via a clean isolated curl test).
+    # A genuine narrower non-empty override works fine, though, so we use
+    # one of Authlete's built-in default scopes -- satisfies neither of our
+    # gated tools' requirements, so it still triggers a real 403.
+    "Sign in with unrelated scope (email) -- expect failure": "email",
 }
+
+# A resource this MCP server does not recognize -- for the "wrong audience"
+# test case, done as a genuinely fresh authorization request rather than an
+# issue-time override (Authlete's issue API has no 'resources' override,
+# unlike 'scopes').
+WRONG_RESOURCE = "https://wrong-server.example/resource"
 
 
 async def authlete_post(path: str, body: dict) -> dict:
@@ -58,8 +70,9 @@ async def well_known(request):
 
 
 async def authorize(request):
+    original_query = str(request.url.query)
     auth_result = await authlete_post(
-        "auth/authorization", {"parameters": str(request.url.query)}
+        "auth/authorization", {"parameters": original_query}
     )
 
     if auth_result.get("action") != "INTERACTION":
@@ -68,22 +81,48 @@ async def authorize(request):
         return JSONResponse(auth_result, status_code=400)
 
     ticket = auth_result["ticket"]
+    print(f"[authserver] DEBUG /authorize requested scope in query: {request.query_params.get('scope')!r}")
+    print(f"[authserver] DEBUG ticket issued: {ticket!r}")
     links = "".join(
         f'<p><a href="/authorize/confirm?{urlencode({"ticket": ticket, "scope": scope})}">{label}</a></p>'
         for label, scope in SCOPE_CHOICES.items()
     )
+    links += (
+        f'<p><a href="/authorize/wrong-resource?{urlencode({"original_query": original_query})}">'
+        f"Sign in for a different resource -- expect failure</a></p>"
+    )
     return HTMLResponse(f"<html><body><h3>Choose what to grant (demo consent screen)</h3>{links}</body></html>")
+
+
+async def wrong_resource(request):
+    original_query = request.query_params["original_query"]
+    params = dict(parse_qsl(original_query))
+    params["resource"] = WRONG_RESOURCE
+    print(f"[authserver] DEBUG /authorize/wrong-resource overriding resource to: {WRONG_RESOURCE!r}")
+
+    auth_result = await authlete_post("auth/authorization", {"parameters": urlencode(params)})
+    if auth_result.get("action") != "INTERACTION":
+        return JSONResponse(auth_result, status_code=400)
+
+    issue_result = await authlete_post(
+        "auth/authorization/issue",
+        {"ticket": auth_result["ticket"], "subject": DEMO_SUBJECT},
+    )
+    print(f"[authserver] DEBUG issue_result: {issue_result!r}")
+    return RedirectResponse(issue_result["responseContent"], status_code=302)
 
 
 async def confirm(request):
     ticket = request.query_params["ticket"]
     scope = request.query_params.get("scope", "")
     scopes = [scope] if scope else []
+    print(f"[authserver] DEBUG /authorize/confirm ticket={ticket!r} raw scope param={scope!r} scopes sent to issue={scopes!r}")
 
     issue_result = await authlete_post(
         "auth/authorization/issue",
         {"ticket": ticket, "subject": DEMO_SUBJECT, "scopes": scopes},
     )
+    print(f"[authserver] DEBUG issue_result: {issue_result!r}")
     return RedirectResponse(issue_result["responseContent"], status_code=302)
 
 
@@ -108,6 +147,7 @@ app = Starlette(
         Route("/.well-known/oauth-authorization-server", well_known),
         Route("/authorize", authorize),
         Route("/authorize/confirm", confirm),
+        Route("/authorize/wrong-resource", wrong_resource),
         Route("/token", token, methods=["POST"]),
     ]
 )

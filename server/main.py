@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 
+import uvicorn
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
 
 from auth import RESOURCE_URI, AuthleteTokenVerifier
+from scope_gate import ScopeEnforcementMiddleware
 
 mcp = FastMCP(
     "mcp-auth-demo",
@@ -24,4 +26,6 @@ def get_time() -> str:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    app = mcp.streamable_http_app()
+    app.add_middleware(ScopeEnforcementMiddleware)
+    uvicorn.run(app, host="127.0.0.1", port=8000)

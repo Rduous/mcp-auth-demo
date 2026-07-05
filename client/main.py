@@ -61,9 +61,15 @@ async def main():
     redirect_uri = f"http://127.0.0.1:{port}/callback"
 
     async def handle_callback() -> tuple[str, str | None]:
-        await asyncio.to_thread(callback_server.handle_request)
-        params = callback_server.callback_query
-        return params["code"][0], params.get("state", [None])[0]
+        # Called again on step-up (e.g. after a 403 insufficient_scope), so
+        # this must tolerate stray requests (favicon, etc.) rather than
+        # crashing on the first thing that isn't the real redirect.
+        while True:
+            callback_server.callback_query = None
+            await asyncio.to_thread(callback_server.handle_request)
+            params = callback_server.callback_query or {}
+            if "code" in params:
+                return params["code"][0], params.get("state", [None])[0]
 
     oauth_auth = OAuthClientProvider(
         server_url=SERVER_URL,

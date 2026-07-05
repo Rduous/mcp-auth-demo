@@ -64,9 +64,9 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 5 — Scope enforcement + step-up
 
-- [ ] Gate protected tool on a scope
-- [ ] Demonstrate `403 insufficient_scope` path
-- [ ] Demonstrate client re-running a narrow auth request for just that scope
+- [x] Gate protected tool on a scope — `get_time` requires `mcp:tools`, enforced by `server/scope_gate.py`'s `ScopeEnforcementMiddleware` (custom middleware, per the design decision logged in [NOTES.md](NOTES.md))
+- [x] Demonstrate `403 insufficient_scope` path — confirmed with a real `logs:read`-only token and an `email`-only token, both correctly rejected
+- [x] Demonstrate client re-running a narrow auth request for just that scope — the SDK's `OAuthClientProvider` does this **automatically** on `403 insufficient_scope`, once our middleware's `WWW-Authenticate` header included a proper `scope="..."` field (RFC 6750 §3.1). Confirmed live: second auth attempt requested exactly `mcp:tools`, nothing else, and the retried tool call succeeded.
 
 ---
 
