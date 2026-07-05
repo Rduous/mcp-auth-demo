@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from auth import AuthleteTokenVerifier
+from auth import AuthleteTokenVerifier, ScopeCheckResult
 
 # Which scope each protected tool requires. A tool not listed here needs no
 # scope beyond a plain valid, audience-bound token.
@@ -40,8 +40,8 @@ class ScopeEnforcementMiddleware(BaseHTTPMiddleware):
                     auth_header = request.headers.get("authorization", "")
                     if auth_header.lower().startswith("bearer "):
                         token = auth_header[7:]
-                        access_token = await _verifier.verify_token(token)
-                        if access_token and required_scope not in access_token.scopes:
+                        result = await _verifier.check_scope(token, required_scope)
+                        if result == ScopeCheckResult.INSUFFICIENT:
                             # `scope=` here is what lets an MCP-spec-aware client
                             # (e.g. the SDK's OAuthClientProvider) automatically
                             # step up and re-request just this scope -- RFC 6750 §3.1.
@@ -59,7 +59,11 @@ class ScopeEnforcementMiddleware(BaseHTTPMiddleware):
                                     )
                                 },
                             )
-                    # No/invalid token: let it through -- FastMCP's own auth
-                    # middleware already returns the correct 401 for that case.
+                    # No bearer token, SUFFICIENT, or INVALID: let it through.
+                    # FastMCP's own auth middleware (a separate verify_token
+                    # call, scope-agnostic) already returns the correct 401
+                    # for a missing/invalid token, and 200 for a genuinely
+                    # sufficient one -- this middleware only ever needs to
+                    # inject the 403 case.
 
         return await call_next(request)

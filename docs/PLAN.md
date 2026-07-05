@@ -58,7 +58,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] Reuse the Phase 2 placeholder resource URI here and in Phase 3's `resource` param — confirmed, single `RESOURCE_URI` constant in `server/auth.py`, used consistently
 - [x] Server checks `aud`/resource itself on every request regardless of Authlete's own check (see corrected finding in [NOTES.md](NOTES.md)) — defense-in-depth, not the only line of defense
 - [x] Negative test: a token issued for a different resource must be rejected by our server (`401 invalid_token`) — confirmed. Minted a real token with `aud`/`accessTokenResources` = `https://wrong-server.example/resource`, called our server, got `401`. Same server previously returned `200` for a correctly-bound token.
-- [ ] Once Phase 5 adds a per-tool required scope, also pass it as `scopes` alongside `resources` in the introspection call — Authlete's combined scope+resource check then genuinely enforces both natively
+- [x] Once Phase 5 adds a per-tool required scope, also pass it as `scopes` alongside `resources` in the introspection call — Authlete's combined scope+resource check then genuinely enforces both natively. `AuthleteTokenVerifier.check_scope` in `server/auth.py`, wired into `scope_gate.py`. Confirmed live: a `logs:read`-only token calling `get_time` produced a real Authlete `action: FORBIDDEN` on the combined `scopes`+`resources` introspection call (not just our own app-side scope comparison), correctly surfaced as `403 insufficient_scope`.
 
 ---
 
