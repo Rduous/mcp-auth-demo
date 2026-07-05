@@ -8,6 +8,7 @@ services:
   - type: web
     name: mcp-auth-server
     runtime: docker
+    plan: free
     dockerContext: .
     dockerfilePath: ./server/Dockerfile
     healthCheckPath: /healthz
@@ -32,6 +33,7 @@ services:
   - type: web
     name: mcp-auth-authserver
     runtime: docker
+    plan: free
     dockerContext: .
     dockerfilePath: ./authserver/Dockerfile
     healthCheckPath: /healthz
