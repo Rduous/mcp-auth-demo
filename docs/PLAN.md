@@ -119,6 +119,20 @@ Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE9
 
 ---
 
+## Phase 10 — Agent-verifiable test scenarios
+
+Grading leans on an agent driving the real system and observing behavior, not a unit-test suite — and per Phase 7, that agent only ever runs `client/main.py`, never `server`/`authserver` or their logs. Several required scenarios (revocation, expiration, exhausted step-up, wrong audience) don't arise from normal client use, so the client itself needs to become a scriptable harness for staging and observing them. Design doc: [TESTING_STRATEGY.md](TESTING_STRATEGY.md). Agent-facing instructions: [AGENT_TESTING.md](AGENT_TESTING.md).
+
+- [ ] Fix `client/main.py`'s uncaught-exception-on-terminal-auth-failure bug; print structured `RESULT: OK/ERROR ...` lines instead
+- [ ] Headless consent driver in `client/main.py` (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` env vars), off by default — real-browser demo path unchanged when unset
+- [ ] File-backed `TokenStorage` so tokens persist across separate CLI invocations, not just within one process
+- [ ] New `revoke` subcommand + `authserver` `/revoke` route wrapping Authlete's `/auth/revocation` (RFC 7009)
+- [ ] New `probe` subcommand (static bearer token, bypasses the SDK's auto-reauth) — the actual verification primitive for revoked/expired/mis-scoped tokens
+- [ ] One-time Authlete console setup: `short-lived` scope with a short duration override, for deterministic expiration testing
+- [ ] Verify all 8 scenarios in `AGENT_TESTING.md` produce their documented `RESULT:` line
+
+---
+
 ## Wrong-turn / correction log
 *(add entries as they happen — a dozen sharp ones beats fifty verbose ones)*
 
