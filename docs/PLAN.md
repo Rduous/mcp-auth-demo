@@ -11,6 +11,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] **Which AS?** Shortlisted **Authlete** (top pick) and **WorkOS** (backup) — both SaaS, both claim shipped CIMD support with real engineering-level docs, unlike OSS options (e.g. Ory Hydra) where CIMD is still an open feature request. Provisional pending the Phase 0 spike below. See [NOTES.md](NOTES.md).
 - [x] **Protected tool choice** — `get_time` (no args). Will need a second tool (`logs:read`-gated, per Phase 6) to actually demonstrate scope *differentiation* — one tool alone can only show authenticated-vs-not, not that different scopes unlock different things.
 - [x] **"Single command" CLI** — one-shot. `python3 client/main.py` does everything: discovers the AS, opens the browser, catches the redirect on a real ephemeral-port loopback server, exchanges the code, calls the tool. No separate `login` step, no manual paste-back.
+  - **Superseded 2026-07-05, Phase 10**: no longer "every time." Tokens now persist across invocations (`FileTokenStorage`, see Phase 10), so the browser/consent step only actually happens on the *first* run against a given identity — later runs silently reuse the cached token as long as it's valid, and won't show the auth flow at all. See the dated entry in [NOTES.md](NOTES.md) for the full reasoning. Delete `.mcp_auth_state.json` (repo root) to force a fresh run.
 - [x] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus — resolved: it's a bonus, and it's built. Turned out not to need Phase 7 after all — the write-up's actual design (in-repo content, served in-band) works fine locally.
 
 ---
@@ -88,7 +89,7 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 - [x] Add `/healthz` to both `server/main.py` and `authserver/main.py`, bind both to `0.0.0.0` — used FastMCP's `@mcp.custom_route` decorator for the server side (its own docstring suggested exactly this for health checks). Verified live locally: both return `200`, and the server's pre-existing `401`-without-token behavior is unchanged.
 - [x] Make `RESOURCE_URI` (`server/auth.py`) and `ISSUER` (`authserver/main.py`) read from env vars instead of hardcoded `127.0.0.1` constants — also found and fixed a third hardcoded spot the original plan missed: `server/main.py`'s `AuthSettings(issuer_url=...)`, the resource server's own pointer to where the AS lives, needed the same treatment or it'd keep telling clients to discover an AS at localhost post-deploy.
 - [x] Write a `Dockerfile` per service (shared root-level `requirements.txt`, so build context stays repo root, `dockerfilePath` points into the subdir) — surfaced a real bug while doing this: `server/main.py` only built its Starlette `app` inside `if __name__ == "__main__":`, which `uvicorn main:app` (what the Dockerfile's `CMD` needs) never executes. Moved `app` construction to module level, matching how `authserver/main.py` already did it.
-- [ ] Verify both containers locally via `docker compose up` before touching Render — `docker-compose.yml` + `.env.example` written; blocked on Docker Desktop being installed locally
+- [x] Verify both containers locally via `docker compose up` before touching Render — confirmed: both images build, both containers boot, `/healthz` returns `200` on each, `401`-without-token on `/mcp` unchanged (dummy Authlete credentials; real end-to-end OAuth flow through containers not yet tried)
 - [ ] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo — `render.yaml` written; account/Blueprint creation still to do
 - [ ] Point `RESOURCE_URI`/`ISSUER` env vars at the real `*.onrender.com` hostnames Render assigns
 - [ ] Smoke test end to end against the real URLs (same 401+PRM curl check as Phase 2, then a full `client/main.py` run) — watch for the free tier's ~1 min cold-start on first hit after idle
@@ -123,12 +124,12 @@ Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer) lives in
 
 Grading leans on an agent driving the real system and observing behavior, not a unit-test suite — and per Phase 7, that agent only ever runs `client/main.py`, never `server`/`authserver` or their logs. Several required scenarios (revocation, expiration, exhausted step-up, wrong audience) don't arise from normal client use, so the client itself needs to become a scriptable harness for staging and observing them. Design doc: [TESTING_STRATEGY.md](TESTING_STRATEGY.md). Agent-facing instructions: [AGENT_TESTING.md](AGENT_TESTING.md).
 
-- [ ] Fix `client/main.py`'s uncaught-exception-on-terminal-auth-failure bug; print structured `RESULT: OK/ERROR ...` lines instead
+- [x] Fix `client/main.py`'s uncaught-exception-on-terminal-auth-failure bug; print structured `RESULT: OK/ERROR ...` lines instead
 - [ ] Headless consent driver in `client/main.py` (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` env vars), off by default — real-browser demo path unchanged when unset
-- [ ] File-backed `TokenStorage` so tokens persist across separate CLI invocations, not just within one process
+- [x] File-backed `TokenStorage` so tokens persist across separate CLI invocations, not just within one process — `FileTokenStorage`, `.mcp_auth_state.json` (gitignored). Verified the round-trip directly: a token saved by one instance is read back correctly by a fresh one, simulating separate CLI invocations.
 - [ ] New `revoke` subcommand + `authserver` `/revoke` route wrapping Authlete's `/auth/revocation` (RFC 7009)
-- [ ] New `probe` subcommand (static bearer token, bypasses the SDK's auto-reauth) — the actual verification primitive for revoked/expired/mis-scoped tokens
-- [ ] One-time Authlete console setup: `short-lived` scope with a short duration override, for deterministic expiration testing
+- [x] New `probe` subcommand (static bearer token, bypasses the SDK's auto-reauth) — the actual verification primitive for revoked/expired/mis-scoped tokens. Uses `streamablehttp_client`'s plain `headers=` param, no custom `httpx.Auth` class needed. Verified live: fails cleanly with `RESULT: ERROR ...` when no token is staged yet.
+- [x] One-time Authlete console setup: `short-lived` scope with a short duration override, for deterministic expiration testing — done (`access_token.duration` = `10`), confirmed live via a `service/get` curl check
 - [ ] Verify all 8 scenarios in `AGENT_TESTING.md` produce their documented `RESULT:` line
 
 ---

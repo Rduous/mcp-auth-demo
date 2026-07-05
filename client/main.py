@@ -1,9 +1,13 @@
 import asyncio
+import json
+import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import click
+import httpx
 from mcp import ClientSession
 from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
@@ -11,6 +15,17 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAu
 
 SERVER_URL = "http://127.0.0.1:8000/mcp"
 CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
+
+# Persisted across separate CLI invocations (not just within one process) --
+# needed so a scenario can stage a token in one command (get-time) and
+# reuse the *same* token in a later one (probe), e.g. after a wait to test
+# expiration. Gitignored; delete it to force a fresh identity.
+#
+# Anchored to this file's own location (repo root), not the process's
+# working directory -- running the CLI from client/ instead of the repo
+# root would otherwise silently create a second, disconnected state file
+# there instead of reusing the one at the root.
+STATE_FILE = Path(__file__).resolve().parent.parent / ".mcp_auth_state.json"
 
 # NOTE: it's tempting to set client_metadata.scope per-tool to request only
 # what's needed and avoid a step-up round trip -- doesn't work. The first
@@ -20,22 +35,40 @@ CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
 # of anything we set locally. Not worth fighting; see NOTES.md.
 
 
-class InMemoryTokenStorage(TokenStorage):
-    def __init__(self):
-        self.tokens: OAuthToken | None = None
-        self.client_info: OAuthClientInformationFull | None = None
+class FileTokenStorage(TokenStorage):
+    """Same role as the SDK's in-memory example storage, but backed by a
+    JSON file so state survives across separate `python client/main.py ...`
+    invocations, not just within one process.
+    """
+
+    def __init__(self, path: Path = STATE_FILE):
+        self.path = path
+        try:
+            self._state: dict = json.loads(path.read_text())
+        except FileNotFoundError:
+            self._state = {}
 
     async def get_tokens(self) -> OAuthToken | None:
-        return self.tokens
+        data = self._state.get("tokens")
+        return OAuthToken.model_validate(data) if data else None
 
     async def set_tokens(self, tokens: OAuthToken) -> None:
-        self.tokens = tokens
+        self._state["tokens"] = tokens.model_dump(mode="json")
+        self._save()
 
     async def get_client_info(self) -> OAuthClientInformationFull | None:
-        return self.client_info
+        data = self._state.get("client_info")
+        return OAuthClientInformationFull.model_validate(data) if data else None
 
     async def set_client_info(self, client_info: OAuthClientInformationFull) -> None:
-        self.client_info = client_info
+        self._state["client_info"] = client_info.model_dump(mode="json")
+        self._save()
+
+    def _save(self) -> None:
+        self.path.write_text(json.dumps(self._state, indent=2))
+        # Holds a live bearer token -- restrict to owner-only, same as e.g.
+        # ~/.aws/credentials, rather than leaving it at the default umask.
+        self.path.chmod(0o600)
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
@@ -89,7 +122,7 @@ async def call_tool(tool_name: str, arguments: dict) -> str:
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],
         ),
-        storage=InMemoryTokenStorage(),
+        storage=FileTokenStorage(),
         redirect_handler=handle_redirect,
         callback_handler=handle_callback,
         client_metadata_url=CIMD_URL,
@@ -102,6 +135,50 @@ async def call_tool(tool_name: str, arguments: dict) -> str:
             return result.content[0].text
 
 
+async def probe_tool(tool_name: str, arguments: dict) -> str:
+    """Call a tool with whatever token is currently on disk, using a plain
+    static bearer header instead of OAuthClientProvider -- deliberately no
+    auto-reauth/step-up healing. That healing is exactly right for
+    `call_tool`'s real-demo path, and exactly wrong here: it would silently
+    replace a revoked/expired/wrong-audience token with a fresh working one,
+    masking the failure this command exists to observe cleanly.
+    """
+    tokens = await FileTokenStorage().get_tokens()
+    if tokens is None:
+        raise RuntimeError(f"No stored token in {STATE_FILE} -- run get-time or get-logs first to stage one.")
+
+    headers = {"Authorization": f"Bearer {tokens.access_token}"}
+    async with streamablehttp_client(SERVER_URL, headers=headers) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(tool_name, arguments)
+            return result.content[0].text
+
+
+def _describe_error(exc: BaseException) -> str:
+    if isinstance(exc, BaseExceptionGroup):
+        return _describe_error(exc.exceptions[0])
+    if isinstance(exc, httpx.HTTPStatusError):
+        response = exc.response
+        try:
+            body = response.json()
+            detail = body.get("error_description") or body.get("error") or response.text
+        except ValueError:
+            detail = response.text
+        return f"{response.status_code} {detail}"
+    return str(exc)
+
+
+def _run(coro) -> None:
+    try:
+        result = asyncio.run(coro)
+    except Exception as e:
+        print(f"RESULT: ERROR {_describe_error(e)}")
+        sys.exit(1)
+    else:
+        print(f"RESULT: OK {result}")
+
+
 @click.group()
 def cli():
     """MCP auth demo client -- discovers the AS, authenticates via CIMD, calls a protected tool."""
@@ -110,7 +187,7 @@ def cli():
 @cli.command("get-time")
 def get_time_cmd():
     """Tell me the time."""
-    print(asyncio.run(call_tool("get_time", {})))
+    _run(call_tool("get_time", {}))
 
 
 @cli.command("get-logs")
@@ -118,7 +195,18 @@ def get_time_cmd():
 def get_logs_cmd(topic):
     """Tell me more about [topic] -- reads the project's detailed work log."""
     arguments = {"topic": topic} if topic else {}
-    print(asyncio.run(call_tool("get_logs", arguments)))
+    _run(call_tool("get_logs", arguments))
+
+
+@cli.command("probe")
+@click.argument("tool", type=click.Choice(["get-time", "get-logs"]))
+@click.option("--topic", default=None, help="Only used with get-logs.")
+def probe_cmd(tool, topic):
+    """Call TOOL with the currently stored token, bypassing auto-reauth --
+    the way to verify a revoked/expired/mis-scoped token cleanly."""
+    tool_name = tool.replace("-", "_")
+    arguments = {"topic": topic} if (tool_name == "get_logs" and topic) else {}
+    _run(probe_tool(tool_name, arguments))
 
 
 if __name__ == "__main__":
