@@ -26,3 +26,5 @@ A human-written summary of work done with the coding agent on this project, inte
   - Designed: headless, env-var-driven consent selection in the client; file-backed token storage so state survives across separate CLI invocations; a real `/revoke` endpoint (RFC 7009) to stage revocation; an Authlete short-lived-scope trick to stage expiration deterministically; and a `probe` subcommand that bypasses the SDK's auto-reauth so failures surface cleanly instead of being silently healed.
   - Wrote up the design rationale (`TESTING_STRATEGY.md`) and the agent-facing scenario instructions (`AGENT_TESTING.md`), and added a new Phase 10 to the plan tracking the (not yet built) implementation.
 - Added file system storage of tokens to allow auth-once behavior and enable testing of token expiration.
+- Deployed servers to Render.
+- Executed agent test suite against production servers.
