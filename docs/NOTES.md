@@ -18,6 +18,7 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 
 - Left disabled. FAPI mandates PAR/signed request objects/mTLS-DPoP and disallows our plain public-client pattern — none of it is in the MCP spec, just added failure risk.
 
+<a name="phase-0-curl-spike"></a>
 ## 2026-07-04 — Phase 0 curl spike against Authlete
 
 - CIMD confirmed real end-to-end: authorization response showed `metadataDocumentUsed:true`, `clientSource:METADATA_DOCUMENT` — Authlete fetched our hosted doc, didn't use a pre-registered client.
@@ -55,6 +56,7 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - Decision: stay on Authlete, stand up our own minimal AS-frontend (`/authorize`, `/token`, `/.well-known/oauth-authorization-server`). Sign-in will be a **no-op** — auto-approve a single hardcoded demo subject, no real login form. Marked with a TODO in the AS-frontend code once built.
 - Added a future refinement (not required by the assignment): swap the no-op sign-in for real Google SSO, with the allowed-subjects check enforced in the **MCP resource server** (same layer as our existing audience check), not the AS-frontend.
 
+<a name="correction-audience-check"></a>
 ## 2026-07-04 — Correction: Authlete's resource check does exist, we just never isolated it
 
 - Earlier finding ("Authlete's `/auth/introspection` doesn't reject a mismatched `resources` value") was wrong — or rather, incomplete. Root cause of the original confusion: those test tokens all had `scope: null`, because the scopes we requested (`mcp:tools`, `logs:read`) were never pre-registered at the service level (Tokens and Claims > Advanced > Scope — a real gotcha, not obvious from the API). With `scope: null`, `sufficient` was unconditionally `false` no matter what `resources` we passed, masking any real signal.
@@ -91,6 +93,7 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - Modeled our expected real-world deployment accordingly: a Claude-based agent (the host) running on a user's laptop, our CLI (the client) installed locally, and our MCP server hosted remotely — a single client-server session, matching how a real user would actually run this.
 - Chose custom middleware that inspects each `tools/call` request and checks that specific tool's required scope, over splitting scope tiers across separate FastMCP mounts, so the step-up story (call a tool, get `403`, re-authenticate narrowly for just that scope, retry) stays within one continuous session rather than requiring a second connection to a differently-scoped server.
 
+<a name="phase-5-step-up"></a>
 ## 2026-07-04 — Phase 5 complete: scope enforcement, and step-up came almost for free
 
 - Built `ScopeEnforcementMiddleware` (does its own token verification, independent of FastMCP's internal auth pipeline, so it doesn't depend on middleware ordering). Gated `get_time` on `mcp:tools`.
