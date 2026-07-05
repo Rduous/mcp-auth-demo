@@ -163,8 +163,12 @@ def _describe_error(exc: BaseException) -> str:
         try:
             body = response.json()
             detail = body.get("error_description") or body.get("error") or response.text
-        except ValueError:
-            detail = response.text
+        except Exception:
+            # The streamable-HTTP transport reads this response as a stream
+            # internally -- by the time we get here its body may no longer
+            # be accessible at all (httpx.ResponseNotRead), not just
+            # malformed JSON. Status code alone is still fine to report.
+            detail = "(response body unavailable)"
         return f"{response.status_code} {detail}"
     return str(exc)
 
