@@ -74,7 +74,16 @@ async def well_known(request):
             "code_challenge_methods_supported": ["S256"],
             "token_endpoint_auth_methods_supported": ["none"],
             "client_id_metadata_document_supported": True,
-            "scopes_supported": ["mcp:tools", "logs:read"],
+            # Authlete's /auth/authorization/issue can only *narrow* the
+            # scope carried by the original /authorize request, never add to
+            # it (confirmed via their KB: "cannot include additional scopes
+            # that you did not request at the /auth/authorization API").
+            # Our client has no per-tool scope hint yet at the point it
+            # builds that first request, so it falls back to requesting
+            # everything advertised here -- short-lived has to be listed for
+            # the consent screen's combined-scope choice to be grantable at
+            # all, not just registered as a service-level scope.
+            "scopes_supported": ["mcp:tools", "logs:read", "short-lived"],
         }
     )
 
