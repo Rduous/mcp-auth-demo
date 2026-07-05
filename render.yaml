@@ -16,10 +16,16 @@ services:
     # unrelated docs/client/authserver-only commits on main from triggering
     # a rebuild. Paths are always repo-root-relative regardless of
     # dockerContext (Render's own behavior, not specific to this repo).
+    #
+    # docs/NOTES.md is deliberately included, not just server/** -- the
+    # Dockerfile bakes it into the image (get_logs reads it from disk, not
+    # over the network), so an edit there needs a rebuild too or the
+    # deployed tool silently serves a stale copy.
     buildFilter:
       paths:
         - server/**
         - requirements.txt
+        - docs/NOTES.md
     envVars:
       - key: AUTHLETE_SERVICE_ID
         sync: false
