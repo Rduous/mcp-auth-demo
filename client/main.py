@@ -228,5 +228,16 @@ def probe_cmd(ctx, tool, topic):
     _run(probe_tool(tool_name, arguments, ctx.obj))
 
 
+@cli.command("reset")
+def reset_cmd():
+    """Clear the cached token and client identity, so the next command
+    authenticates from scratch instead of silently reusing what's stored."""
+    if STATE_FILE.exists():
+        STATE_FILE.unlink()
+        print(f"RESULT: OK cleared {STATE_FILE}")
+    else:
+        print(f"RESULT: OK nothing to clear ({STATE_FILE} doesn't exist)")
+
+
 if __name__ == "__main__":
     cli()

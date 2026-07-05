@@ -55,7 +55,7 @@ underspecified — stop and flag it rather than reaching around the client.
 **Reset** (run before any scenario marked "fresh state" below):
 
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 ```
 
 Clears the persisted token and registered client info, so the next command
@@ -78,14 +78,14 @@ signal.
 
 ### 1. Happy path — `mcp:tools`
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=mcp:tools python client/main.py get-time
 ```
 Expect: `RESULT: OK ...` (a timestamp).
 
 ### 2. Happy path — `logs:read`
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=logs:read python client/main.py get-logs
 ```
 Expect: `RESULT: OK ...` (log content).
@@ -100,7 +100,7 @@ must not unlock `get_time`.
 
 ### 4. Step-up succeeds
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=email MCP_AUTH_CONSENT_RETRY=mcp:tools python client/main.py get-time
 ```
 Expect: `RESULT: OK ...`. Stdout should also show two authorization attempts
@@ -109,7 +109,7 @@ Expect: `RESULT: OK ...`. Stdout should also show two authorization attempts
 
 ### 5. Step-up exhausted
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=logs:read MCP_AUTH_CONSENT_RETRY=logs:read python client/main.py get-time
 ```
 Expect: `RESULT: ERROR 403 insufficient_scope ...`, terminal — no third
@@ -118,7 +118,7 @@ looping, per the SDK's documented behavior.
 
 ### 6. Wrong audience
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=wrong-resource python client/main.py get-time
 ```
 Expect: `RESULT: ERROR 401 ...` — token minted for a different resource must
@@ -126,7 +126,7 @@ be rejected.
 
 ### 7. Revocation
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT=mcp:tools python client/main.py get-time   # expect RESULT: OK
 python client/main.py revoke                                 # expect RESULT: OK
 python client/main.py probe get-time                          # expect RESULT: ERROR 401
@@ -137,7 +137,7 @@ python client/main.py probe get-time                          # expect RESULT: E
 [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for why): register a scope named
 `short-lived` with a 10-second token-duration override.
 ```bash
-rm -f .mcp_auth_state.json
+python client/main.py reset
 MCP_AUTH_CONSENT="mcp:tools short-lived" python client/main.py get-time   # expect RESULT: OK
 sleep 12
 python client/main.py probe get-time                                       # expect RESULT: ERROR 401
