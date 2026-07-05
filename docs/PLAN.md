@@ -125,9 +125,9 @@ Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer) lives in
 Grading leans on an agent driving the real system and observing behavior, not a unit-test suite — and per Phase 7, that agent only ever runs `client/main.py`, never `server`/`authserver` or their logs. Several required scenarios (revocation, expiration, exhausted step-up, wrong audience) don't arise from normal client use, so the client itself needs to become a scriptable harness for staging and observing them. Design doc: [TESTING_STRATEGY.md](TESTING_STRATEGY.md). Agent-facing instructions: [AGENT_TESTING.md](AGENT_TESTING.md).
 
 - [x] Fix `client/main.py`'s uncaught-exception-on-terminal-auth-failure bug; print structured `RESULT: OK/ERROR ...` lines instead
-- [ ] Headless consent driver in `client/main.py` (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` env vars), off by default — real-browser demo path unchanged when unset
+- [x] Headless consent driver in `client/main.py` (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` env vars), off by default — real-browser demo path unchanged when unset. `_auto_consent()` walks the consent screen's own links via `httpx`, no browser needed.
 - [x] File-backed `TokenStorage` so tokens persist across separate CLI invocations, not just within one process — `FileTokenStorage`, `.mcp_auth_state.json` (gitignored). Verified the round-trip directly: a token saved by one instance is read back correctly by a fresh one, simulating separate CLI invocations.
-- [ ] New `revoke` subcommand + `authserver` `/revoke` route wrapping Authlete's `/auth/revocation` (RFC 7009)
+- [x] New `revoke` subcommand + `authserver` `/revoke` route wrapping Authlete's `/auth/revocation` (RFC 7009)
 - [x] New `probe` subcommand (static bearer token, bypasses the SDK's auto-reauth) — the actual verification primitive for revoked/expired/mis-scoped tokens. Uses `streamablehttp_client`'s plain `headers=` param, no custom `httpx.Auth` class needed. Verified live: fails cleanly with `RESULT: ERROR ...` when no token is staged yet.
 - [x] One-time Authlete console setup: `short-lived` scope with a short duration override, for deterministic expiration testing — done (`access_token.duration` = `10`), confirmed live via a `service/get` curl check
 - [ ] Verify all 8 scenarios in `AGENT_TESTING.md` produce their documented `RESULT:` line

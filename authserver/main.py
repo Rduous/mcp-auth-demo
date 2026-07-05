@@ -69,6 +69,7 @@ async def well_known(request):
             "issuer": ISSUER,
             "authorization_endpoint": f"{ISSUER}/authorize",
             "token_endpoint": f"{ISSUER}/token",
+            "revocation_endpoint": f"{ISSUER}/revoke",
             "response_types_supported": ["code"],
             "grant_types_supported": ["authorization_code", "refresh_token"],
             "code_challenge_methods_supported": ["S256"],
@@ -167,6 +168,37 @@ async def token(request):
     return JSONResponse(content, status_code=status)
 
 
+async def revoke(request):
+    """RFC 7009 token revocation, wrapping Authlete's /auth/revocation.
+    Real protocol feature, not a test-only backdoor -- safe to expose
+    publicly since a caller can only revoke a token it already holds, same
+    trust model /token already has for this public (no-secret) client.
+    """
+    form = dict(await request.form())
+    client_id = form.pop("client_id", None)
+    print(f"[authserver] DEBUG /revoke form={form!r} client_id={client_id!r}")
+
+    revoke_result = await authlete_post(
+        "auth/revocation",
+        {"clientId": client_id, "parameters": urlencode(form)},
+    )
+    print(f"[authserver] DEBUG /revoke revoke_result={revoke_result!r}")
+
+    action = revoke_result.get("action")
+    # Per Authlete's RevocationResponse: OK -> 200 (RFC 7009 says respond
+    # 200 even for an already-invalid/unknown token, to avoid turning this
+    # endpoint into an oracle for which tokens are live); everything else
+    # maps to the error responseContent Authlete already built.
+    status = {"OK": 200, "INVALID_CLIENT": 400, "BAD_REQUEST": 400}.get(action, 500)
+    content = revoke_result.get("responseContent")
+    if not content:
+        return PlainTextResponse("", status_code=status)
+    try:
+        return JSONResponse(json.loads(content), status_code=status)
+    except json.JSONDecodeError:
+        return PlainTextResponse(content, status_code=status)
+
+
 app = Starlette(
     routes=[
         Route("/healthz", healthz),
@@ -175,6 +207,7 @@ app = Starlette(
         Route("/authorize/confirm", confirm),
         Route("/authorize/wrong-resource", wrong_resource),
         Route("/token", token, methods=["POST"]),
+        Route("/revoke", revoke, methods=["POST"]),
     ]
 )
 

@@ -1,13 +1,12 @@
 # Agent-driven scenario verification
 
-**Status: partially implemented.** File-backed token storage, the `probe`
-subcommand, structured `RESULT:` output, and a production-by-default
-`SERVER_URL` all exist in [client/main.py](../client/main.py) now. Still
-missing: the `revoke` subcommand + `authserver`'s `/revoke` route
-(Scenario 7), and the `MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` headless
-consent driver (Scenarios 4-8 currently still need a human clicking the
-real consent screen). See [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for
-why it's shaped this way.
+**Status: fully implemented.** File-backed token storage, the `probe` and
+`revoke` subcommands, the `reset` subcommand, structured `RESULT:` output,
+a production-by-default `SERVER_URL`, and the `MCP_AUTH_CONSENT`/
+`MCP_AUTH_CONSENT_RETRY` headless consent driver all exist in
+[client/main.py](../client/main.py) now — every scenario below is
+drivable end to end with no human clicking anything. See
+[TESTING_STRATEGY.md](TESTING_STRATEGY.md) for why it's shaped this way.
 
 **Important**: every command below runs with no flags, which means it hits
 the **live, deployed** `mcp-auth-server`/`mcp-auth-authserver` on Render by

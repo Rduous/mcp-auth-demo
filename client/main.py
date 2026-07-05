@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import re
 import sys
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -19,6 +21,8 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAu
 # services. --local exists purely for our own faster dev-loop iteration.
 PROD_SERVER_URL = "https://mcp-auth-server-06y0.onrender.com/mcp"
 LOCAL_SERVER_URL = "http://127.0.0.1:8000/mcp"
+PROD_AS_URL = "https://mcp-auth-authserver.onrender.com"
+LOCAL_AS_URL = "http://127.0.0.1:8001"
 CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
 
 # Persisted across separate CLI invocations (not just within one process) --
@@ -88,6 +92,36 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence the default request logging
 
 
+async def _auto_consent(auth_url: str, choice: str) -> None:
+    """Drive the demo consent screen ourselves via plain HTTP instead of a
+    real browser -- safe because that screen is static HTML with no JS or
+    session state (confirmed in TESTING_STRATEGY.md). Walks the same links
+    a human would click, then lets httpx follow the resulting redirect
+    straight into our own already-listening loopback callback server.
+    """
+    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+        page = await client.get(auth_url)
+        page.raise_for_status()
+
+        if choice == "wrong-resource":
+            match = re.search(r'href="(/authorize/wrong-resource\?[^"]*)"', page.text)
+            link = match.group(1) if match else None
+        else:
+            link = None
+            for m in re.finditer(r'href="(/authorize/confirm\?[^"]*)"', page.text):
+                candidate = m.group(1)
+                if parse_qs(urlparse(candidate).query).get("scope", [""])[0] == choice:
+                    link = candidate
+                    break
+
+        if link is None:
+            raise RuntimeError(f"No consent-screen link found for MCP_AUTH_CONSENT={choice!r}")
+
+        base = f"{urlparse(auth_url).scheme}://{urlparse(auth_url).netloc}"
+        response = await client.get(base + link)
+        response.raise_for_status()
+
+
 async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
     attempt_count = 0
 
@@ -97,7 +131,15 @@ async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
         scope = parse_qs(urlparse(auth_url).query).get("scope", ["(none)"])[0]
         label = "Step-up re-authorization" if attempt_count > 1 else "Authorization"
         print(f"{label} (attempt {attempt_count}) -- requesting scope: {scope}")
-        webbrowser.open(auth_url)
+
+        choice = os.environ.get("MCP_AUTH_CONSENT")
+        if attempt_count > 1:
+            choice = os.environ.get("MCP_AUTH_CONSENT_RETRY", choice)
+
+        if choice:
+            await _auto_consent(auth_url, choice)
+        else:
+            webbrowser.open(auth_url)
 
     # Loopback server on an OS-assigned ephemeral port. Our CIMD doc only
     # registers a *portless* redirect_uri (http://127.0.0.1/callback) --
@@ -160,6 +202,30 @@ async def probe_tool(tool_name: str, arguments: dict, server_url: str) -> str:
             return result.content[0].text
 
 
+async def revoke_token(as_url: str) -> str:
+    """Revoke the currently-stored access token via the AS's /revoke
+    endpoint (RFC 7009). Deliberately does not clear local state -- probe
+    needs the now-dead token to still be readable afterwards, to prove it
+    actually stopped working rather than just vanishing from our own cache.
+    """
+    storage = FileTokenStorage()
+    tokens = await storage.get_tokens()
+    client_info = await storage.get_client_info()
+    if tokens is None:
+        raise RuntimeError(f"No stored token in {STATE_FILE} -- run get-time or get-logs first to stage one.")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{as_url}/revoke",
+            data={
+                "token": tokens.access_token,
+                "client_id": client_info.client_id if client_info else "",
+            },
+        )
+        response.raise_for_status()
+    return "token revoked"
+
+
 def _describe_error(exc: BaseException) -> str:
     if isinstance(exc, BaseExceptionGroup):
         return _describe_error(exc.exceptions[0])
@@ -197,14 +263,17 @@ def _run(coro) -> None:
 @click.pass_context
 def cli(ctx, local):
     """MCP auth demo client -- discovers the AS, authenticates via CIMD, calls a protected tool."""
-    ctx.obj = LOCAL_SERVER_URL if local else PROD_SERVER_URL
+    ctx.obj = {
+        "server_url": LOCAL_SERVER_URL if local else PROD_SERVER_URL,
+        "as_url": LOCAL_AS_URL if local else PROD_AS_URL,
+    }
 
 
 @cli.command("get-time")
 @click.pass_context
 def get_time_cmd(ctx):
     """Tell me the time."""
-    _run(call_tool("get_time", {}, ctx.obj))
+    _run(call_tool("get_time", {}, ctx.obj["server_url"]))
 
 
 @cli.command("get-logs")
@@ -213,7 +282,7 @@ def get_time_cmd(ctx):
 def get_logs_cmd(ctx, topic):
     """Tell me more about [topic] -- reads the project's detailed work log."""
     arguments = {"topic": topic} if topic else {}
-    _run(call_tool("get_logs", arguments, ctx.obj))
+    _run(call_tool("get_logs", arguments, ctx.obj["server_url"]))
 
 
 @cli.command("probe")
@@ -225,7 +294,14 @@ def probe_cmd(ctx, tool, topic):
     the way to verify a revoked/expired/mis-scoped token cleanly."""
     tool_name = tool.replace("-", "_")
     arguments = {"topic": topic} if (tool_name == "get_logs" and topic) else {}
-    _run(probe_tool(tool_name, arguments, ctx.obj))
+    _run(probe_tool(tool_name, arguments, ctx.obj["server_url"]))
+
+
+@cli.command("revoke")
+@click.pass_context
+def revoke_cmd(ctx):
+    """Revoke the currently-stored access token via the AS's /revoke endpoint."""
+    _run(revoke_token(ctx.obj["as_url"]))
 
 
 @cli.command("reset")
