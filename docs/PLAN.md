@@ -11,7 +11,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] **Which AS?** Shortlisted **Authlete** (top pick) and **WorkOS** (backup) — both SaaS, both claim shipped CIMD support with real engineering-level docs, unlike OSS options (e.g. Ory Hydra) where CIMD is still an open feature request. Provisional pending the Phase 0 spike below. See [NOTES.md](NOTES.md).
 - [x] **Protected tool choice** — `get_time` (no args). Will need a second tool (`logs:read`-gated, per Phase 6) to actually demonstrate scope *differentiation* — one tool alone can only show authenticated-vs-not, not that different scopes unlock different things.
 - [x] **"Single command" CLI** — one-shot. `python3 client/main.py` does everything: discovers the AS, opens the browser, catches the redirect on a real ephemeral-port loopback server, exchanges the code, calls the tool. No separate `login` step, no manual paste-back.
-- [ ] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus.
+- [x] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus — resolved: it's a bonus. Paused for now — the intended design presupposes real hosting infrastructure (Phase 7), which hasn't happened yet.
 
 ---
 
@@ -23,7 +23,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] Confirm AS enforces PKCE — enabled Require PKCE + Require S256 in console's Authorization tab; a request without `code_challenge` is now rejected (`A124301`)
 - [x] Confirm `resource` parameter is accepted — switched service to JWT access tokens (ES256); decoded token's `aud` claim is exactly `["https://rduous.github.io/mcp-auth-demo/resource"]`. See [NOTES.md](NOTES.md).
 - [x] **Resource enforcement isn't automatic on Authlete's side** — `/auth/introspection` doesn't reject a mismatched `resources` value (confirmed via a scope-check control, which does correctly reject). Our MCP resource server must check `aud`/`accessTokenResources` itself. Doesn't block staying on Authlete; changes what Phase 4 builds (see below).
-- [ ] **Decision point:** if any of the above fail, switch AS now — resolved: staying on Authlete. CIMD and resource-acceptance are solid; PKCE enforcement is a config fix, and audience checking will be handled in our own server code either way.
+- [x] **Decision point:** if any of the above fail, switch AS now — resolved: staying on Authlete. CIMD and resource-acceptance are solid; PKCE enforcement is a config fix, and audience checking will be handled in our own server code either way.
 
 ---
 
@@ -39,7 +39,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 - [x] Pick a placeholder canonical resource URI for local dev — `http://127.0.0.1:8000/mcp`, in [server/auth.py](../server/auth.py) as `RESOURCE_URI`, not hardcoded elsewhere
 - [x] Server requires a token, returns `401` + PRM pointing at real AS — verified via curl: `401` + `www-authenticate` → `.well-known/oauth-protected-resource/mcp` → names `https://authlete.com/`
-- [ ] Client discovers AS from the `401` response (not hardcoded) — **this is graded**
+- [x] Client discovers AS from the `401` response (not hardcoded) — **this is graded**. Confirmed via the SDK's `OAuthClientProvider` source: on `401` it discovers Protected Resource Metadata, then the AS's own metadata, before ever attempting authorization. Verified live in Phase 3's testing.
 - [x] **Checkpoint:** decided — call Authlete's `/auth/introspection` (network hop, live revocation check). See [server/auth.py](../server/auth.py) and [session_log.md](session_log.md).
 
 ---
@@ -72,10 +72,10 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 6 — Polish + log-gating idea
 
-- [ ] Required write-up: ungated, plain markdown, public repo
-- [ ] Second tool, gated behind different scope (e.g. `logs:read`), returns extended log
-- [ ] Return log content in-band (not a shareable link — link can leak past scope check)
-- [ ] Call this pattern out explicitly in the write-up
+- [x] Required write-up: ungated, plain markdown, public repo — [docs/WRITEUP.md](WRITEUP.md)
+- [ ] **Paused.** Second tool, gated behind different scope (e.g. `logs:read`), returns extended log — the intended design needs real hosting (Phase 7) to exist first; not blocking submission since this is a bonus, not required
+- [ ] Return log content in-band (not a shareable link — link can leak past scope check) — depends on the item above
+- [x] Call this pattern out explicitly in the write-up — the design reasoning (why in-band, not a link) is already in `WRITEUP.md`'s design-decisions section, ahead of actually building the tool
 
 ---
 
