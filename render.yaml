@@ -26,7 +26,7 @@ services:
       - key: AUTHLETE_SAT
         sync: false
       - key: RESOURCE_URI
-        value: https://mcp-auth-server.onrender.com/mcp
+        value: https://mcp-auth-server-06y0.onrender.com/mcp
       - key: ISSUER
         value: https://mcp-auth-authserver.onrender.com
 
