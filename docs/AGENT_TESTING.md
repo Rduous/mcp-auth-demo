@@ -156,3 +156,9 @@ failed unless it's directly observable from stdout.
 - **Scenario 5's terminal 403 is intentional** — the SDK only attempts
   step-up once per request; a second insufficient-scope response is
   supposed to propagate as a real error, not retry again.
+- **`probe`'s error descriptions usually read `(response body unavailable)`,
+  not the actual error text** (e.g. `insufficient_scope`) — the streamable-
+  HTTP transport reads responses as a stream internally, so by the time
+  `probe` catches the error the body is often no longer readable. The
+  **status code** (`401`/`403`) is the reliable signal; treat the
+  description as best-effort context, not something to assert on.
