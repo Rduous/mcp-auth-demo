@@ -5,7 +5,7 @@ What grading actually needs is narrower: graders reach `server`/`authserver`
 asynchronously, without me present. They never run those two services
 themselves — only `client/main.py`, which holds no secret. That's satisfiable
 for free with Docker + Render. The AWS/Terraform work is real, but it's now
-purely portfolio/interview value — see [PHASE9_AWS_PLAN.md](PHASE9_AWS_PLAN.md).
+purely portfolio/interview value — see `docs/PHASE9_AWS_PLAN.md` (kept locally as personal reference, deliberately gitignored, not part of this repo/submission).
 
 ---
 

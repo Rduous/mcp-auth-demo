@@ -108,7 +108,7 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 
 Phase 7 (Render) already satisfies the actual grading requirement for free. This phase is purely "show real AWS/Terraform skill" for the follow-up interview — do it only if there's time and interest left over.
 
-Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE9_AWS_PLAN.md](PHASE9_AWS_PLAN.md). Decided: **ECS Fargate**, not EKS/k8s.
+Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer) lives in `docs/PHASE9_AWS_PLAN.md` — kept locally as personal reference, deliberately gitignored, **not part of this repo/submission**. Decided: **ECS Fargate**, not EKS/k8s.
 
 - [ ] Register a real domain (Route 53) — the one thing that changes vs. Render's free `*.onrender.com` hostnames
 - [ ] Move the Authlete Service Access Token into SSM Parameter Store (`SecureString`), not an env file
