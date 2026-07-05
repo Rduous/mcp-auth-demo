@@ -5,14 +5,14 @@ from urllib.parse import parse_qsl, urlencode
 import httpx
 import uvicorn
 from starlette.applications import Starlette
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from starlette.routing import Route
 
 AUTHLETE_API_BASE = "https://us.authlete.com/api"
 AUTHLETE_SERVICE_ID = os.environ["AUTHLETE_SERVICE_ID"]
 AUTHLETE_SAT = os.environ["AUTHLETE_SAT"]
 
-ISSUER = "http://127.0.0.1:8001"
+ISSUER = os.environ.get("ISSUER", "http://127.0.0.1:8001")
 
 # TODO: identity is still a no-op -- every request is approved as this one
 # hardcoded subject, no real login. Real identity (Google SSO + allow-list)
@@ -51,6 +51,10 @@ async def authlete_post(path: str, body: dict) -> dict:
             json=body,
         )
     return response.json()
+
+
+async def healthz(request):
+    return PlainTextResponse("OK")
 
 
 async def well_known(request):
@@ -144,6 +148,7 @@ async def token(request):
 
 app = Starlette(
     routes=[
+        Route("/healthz", healthz),
         Route("/.well-known/oauth-authorization-server", well_known),
         Route("/authorize", authorize),
         Route("/authorize/confirm", confirm),
@@ -153,4 +158,4 @@ app = Starlette(
 )
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

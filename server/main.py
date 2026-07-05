@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -5,6 +6,8 @@ from pathlib import Path
 import uvicorn
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 
 from auth import RESOURCE_URI, AuthleteTokenVerifier
 from scope_gate import ScopeEnforcementMiddleware
@@ -15,10 +18,15 @@ mcp = FastMCP(
     json_response=True,
     token_verifier=AuthleteTokenVerifier(),
     auth=AuthSettings(
-        issuer_url="http://127.0.0.1:8001",
+        issuer_url=os.environ.get("ISSUER", "http://127.0.0.1:8001"),
         resource_server_url=RESOURCE_URI,
     ),
 )
+
+
+@mcp.custom_route("/healthz", methods=["GET"])
+async def healthz(request: Request) -> PlainTextResponse:
+    return PlainTextResponse("OK")
 
 
 @mcp.tool()
@@ -51,7 +59,8 @@ def get_logs(topic: str | None = None) -> str:
     return "\n\n".join(matches)
 
 
+app = mcp.streamable_http_app()
+app.add_middleware(ScopeEnforcementMiddleware)
+
 if __name__ == "__main__":
-    app = mcp.streamable_http_app()
-    app.add_middleware(ScopeEnforcementMiddleware)
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

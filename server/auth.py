@@ -8,7 +8,7 @@ AUTHLETE_API_BASE = "https://us.authlete.com/api"
 AUTHLETE_SERVICE_ID = os.environ["AUTHLETE_SERVICE_ID"]
 AUTHLETE_SAT = os.environ["AUTHLETE_SAT"]
 
-RESOURCE_URI = "http://127.0.0.1:8000/mcp"
+RESOURCE_URI = os.environ.get("RESOURCE_URI", "http://127.0.0.1:8000/mcp")
 
 
 class ScopeCheckResult(Enum):

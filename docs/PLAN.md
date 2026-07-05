@@ -85,11 +85,11 @@ Re-scoped from the original "deploy to AWS" plan once we worked out what grading
 
 Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, pair-coding dev loop): [PHASE7_PLAN.md](PHASE7_PLAN.md).
 
-- [ ] Add `/healthz` to both `server/main.py` and `authserver/main.py`, bind both to `0.0.0.0`
-- [ ] Make `RESOURCE_URI` (`server/auth.py`) and `ISSUER` (`authserver/main.py`) read from env vars instead of hardcoded `127.0.0.1` constants
-- [ ] Write a `Dockerfile` per service (shared root-level `requirements.txt`, so build context stays repo root, `dockerfilePath` points into the subdir)
-- [ ] Verify both containers locally via `docker compose up` before touching Render
-- [ ] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo
+- [x] Add `/healthz` to both `server/main.py` and `authserver/main.py`, bind both to `0.0.0.0` — used FastMCP's `@mcp.custom_route` decorator for the server side (its own docstring suggested exactly this for health checks). Verified live locally: both return `200`, and the server's pre-existing `401`-without-token behavior is unchanged.
+- [x] Make `RESOURCE_URI` (`server/auth.py`) and `ISSUER` (`authserver/main.py`) read from env vars instead of hardcoded `127.0.0.1` constants — also found and fixed a third hardcoded spot the original plan missed: `server/main.py`'s `AuthSettings(issuer_url=...)`, the resource server's own pointer to where the AS lives, needed the same treatment or it'd keep telling clients to discover an AS at localhost post-deploy.
+- [x] Write a `Dockerfile` per service (shared root-level `requirements.txt`, so build context stays repo root, `dockerfilePath` points into the subdir) — surfaced a real bug while doing this: `server/main.py` only built its Starlette `app` inside `if __name__ == "__main__":`, which `uvicorn main:app` (what the Dockerfile's `CMD` needs) never executes. Moved `app` construction to module level, matching how `authserver/main.py` already did it.
+- [ ] Verify both containers locally via `docker compose up` before touching Render — `docker-compose.yml` + `.env.example` written; blocked on Docker Desktop being installed locally
+- [ ] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo — `render.yaml` written; account/Blueprint creation still to do
 - [ ] Point `RESOURCE_URI`/`ISSUER` env vars at the real `*.onrender.com` hostnames Render assigns
 - [ ] Smoke test end to end against the real URLs (same 401+PRM curl check as Phase 2, then a full `client/main.py` run) — watch for the free tier's ~1 min cold-start on first hit after idle
 - [ ] Note the cold-start caveat in the write-up in case a grader's client has a short timeout

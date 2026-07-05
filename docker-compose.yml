@@ -1,0 +1,31 @@
+# Local dev loop only -- not deployed anywhere (see render.yaml for that).
+# Bind-mounts source + runs uvicorn --reload so edits show up without a
+# rebuild. Needs a repo-root .env (gitignored) with AUTHLETE_SERVICE_ID and
+# AUTHLETE_SAT -- see .env.example.
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      RESOURCE_URI: http://127.0.0.1:8000/mcp
+      ISSUER: http://127.0.0.1:8001
+    volumes:
+      - ./server:/app/server
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  authserver:
+    build:
+      context: .
+      dockerfile: authserver/Dockerfile
+    ports:
+      - "8001:8001"
+    env_file: .env
+    environment:
+      ISSUER: http://127.0.0.1:8001
+    volumes:
+      - ./authserver:/app/authserver
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload

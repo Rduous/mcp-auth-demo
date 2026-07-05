@@ -1,0 +1,36 @@
+# Render Blueprint. Secret values are marked sync: false -- Render prompts
+# for each one, once, in its dashboard at Blueprint-creation time. They
+# never appear here or anywhere else in git.
+#
+# If you rename a service below, its onrender.com hostname changes too --
+# keep the `value:` lines in sync with whatever Render actually assigns.
+services:
+  - type: web
+    name: mcp-auth-server
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./server/Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: AUTHLETE_SERVICE_ID
+        sync: false
+      - key: AUTHLETE_SAT
+        sync: false
+      - key: RESOURCE_URI
+        value: https://mcp-auth-server.onrender.com/mcp
+      - key: ISSUER
+        value: https://mcp-auth-authserver.onrender.com
+
+  - type: web
+    name: mcp-auth-authserver
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: ./authserver/Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: AUTHLETE_SERVICE_ID
+        sync: false
+      - key: AUTHLETE_SAT
+        sync: false
+      - key: ISSUER
+        value: https://mcp-auth-authserver.onrender.com
