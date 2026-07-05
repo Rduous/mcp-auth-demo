@@ -10,6 +10,7 @@ from auth import AuthleteTokenVerifier
 # scope beyond a plain valid, audience-bound token.
 TOOL_SCOPES = {
     "get_time": "mcp:tools",
+    "get_logs": "logs:read",
 }
 
 _verifier = AuthleteTokenVerifier()

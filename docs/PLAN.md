@@ -11,7 +11,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 - [x] **Which AS?** Shortlisted **Authlete** (top pick) and **WorkOS** (backup) — both SaaS, both claim shipped CIMD support with real engineering-level docs, unlike OSS options (e.g. Ory Hydra) where CIMD is still an open feature request. Provisional pending the Phase 0 spike below. See [NOTES.md](NOTES.md).
 - [x] **Protected tool choice** — `get_time` (no args). Will need a second tool (`logs:read`-gated, per Phase 6) to actually demonstrate scope *differentiation* — one tool alone can only show authenticated-vs-not, not that different scopes unlock different things.
 - [x] **"Single command" CLI** — one-shot. `python3 client/main.py` does everything: discovers the AS, opens the browser, catches the redirect on a real ephemeral-port loopback server, exchanges the code, calls the tool. No separate `login` step, no manual paste-back.
-- [x] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus — resolved: it's a bonus. Paused for now — the intended design presupposes real hosting infrastructure (Phase 7), which hasn't happened yet.
+- [x] Confirm log-gating idea (Phase 6) is in scope for submission, or purely a bonus — resolved: it's a bonus, and it's built. Turned out not to need Phase 7 after all — the write-up's actual design (in-repo content, served in-band) works fine locally.
 
 ---
 
@@ -73,8 +73,8 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 ## Phase 6 — Polish + log-gating idea
 
 - [x] Required write-up: ungated, plain markdown, public repo — [docs/WRITEUP.md](WRITEUP.md)
-- [ ] **Paused.** Second tool, gated behind different scope (e.g. `logs:read`), returns extended log — the intended design needs real hosting (Phase 7) to exist first; not blocking submission since this is a bonus, not required
-- [ ] Return log content in-band (not a shareable link — link can leak past scope check) — depends on the item above
+- [x] Second tool, gated behind different scope (`logs:read`) — `get_logs` in `server/main.py`, gated in `server/scope_gate.py`'s `TOOL_SCOPES`. The write-up's described version (in-repo content, no external hosting) didn't actually need Phase 7 after all. Verified live: a `logs:read`-only token succeeds on `get_logs` and gets a real `403` on `get_time` — genuine differentiation, not just "any scope works."
+- [x] Return log content in-band (not a shareable link — link can leak past scope check) — reads `docs/NOTES.md` directly and returns its text as the tool result
 - [x] Call this pattern out explicitly in the write-up — the design reasoning (why in-band, not a link) is already in `WRITEUP.md`'s design-decisions section, ahead of actually building the tool
 
 ---
@@ -83,11 +83,14 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 Sequenced after Phase 6, not before: deployment is portfolio/interview value, not graded, and doing it after the second tool exists avoids redeploying infra once `logs:read` shows up.
 
+Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer): [PHASE7_PLAN.md](PHASE7_PLAN.md). Decided: **ECS Fargate**, not EKS/k8s — supersedes the "k8s manifests" wording below.
+
 - [ ] Swap the Phase 2 placeholder for the real public HTTPS canonical resource URI (needs a real domain/DNS/TLS to exist first — this is the one point where the value actually changes)
-- [ ] Move the Authlete Service Access Token into a real secret store (AWS Secrets Manager / SSM), not an env file
-- [ ] Containerize the server; bind to `0.0.0.0`, add a health-check endpoint for k8s probes
-- [ ] Terraform for AWS infra; k8s manifests for the deployment
-- [ ] TLS termination (ALB/ingress + cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
+- [ ] Also swap `authserver`'s `ISSUER` constant for its own real public HTTPS URL — two services to deploy, not one; see PHASE7_PLAN.md
+- [ ] Move the Authlete Service Access Token into a real secret store (SSM Parameter Store, `SecureString`), not an env file
+- [ ] Containerize both services; bind to `0.0.0.0`, add a health-check endpoint for ALB target group probes
+- [ ] Terraform for AWS infra: ECS Fargate cluster/services (not k8s), ECR, one shared ALB with host-header routing
+- [ ] TLS termination (ALB + ACM cert) — confirm the externally-visible hostname matches the canonical resource URI exactly (internal vs. public hostname mismatch breaks audience binding silently)
 
 ---
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 import uvicorn
 from mcp.server.auth.settings import AuthSettings
@@ -23,6 +24,15 @@ mcp = FastMCP(
 def get_time() -> str:
     """Return the current UTC time."""
     return datetime.now(timezone.utc).isoformat()
+
+
+NOTES_PATH = Path(__file__).parent.parent / "docs" / "NOTES.md"
+
+
+@mcp.tool()
+def get_logs() -> str:
+    """Return the project's detailed work log. Gated behind logs:read."""
+    return NOTES_PATH.read_text()
 
 
 if __name__ == "__main__":

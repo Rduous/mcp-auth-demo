@@ -102,3 +102,8 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - **Bigger discovery:** the SDK's `OAuthClientProvider` already implements the step-up mechanic Phase 5 asks us to demonstrate — on `403` with `error="insufficient_scope"`, it automatically parses a `scope="..."` field out of `WWW-Authenticate` and re-runs authorization for exactly that scope. We weren't including that field, so it silently degraded to "omit scope" on retry. One header fix, and step-up started working automatically — the client had to become resilient to a second callback round too (was crashing on `KeyError: 'code'` since our loopback handler wasn't written to expect being called twice).
 - Confirmed live: `email`-only token → `403` → automatic second browser popup requesting *only* `mcp:tools` → success, no manual intervention.
 - Predicted and verified a related edge: granting `logs:read` instead of `mcp:tools` on that step-up retry still isn't sufficient, and the SDK only attempts step-up once per request — the second `403` propagates as a real client-side error rather than looping. Deliberate, sane behavior (prevents an infinite retry loop), not a bug.
+
+## 2026-07-04 — Phase 6: second tool built, no AWS needed after all
+
+- Added `get_logs` (`server/main.py`), gated on `logs:read` in `server/scope_gate.py`. Reads and returns `docs/NOTES.md` verbatim — the in-repo, in-band design from `WRITEUP.md`, not the more elaborate externally-hosted version considered and paused earlier.
+- Verified real differentiation, not just "some scope works for everything": a `logs:read`-only token succeeds on `get_logs` and gets a genuine `403 insufficient_scope` on `get_time`.
