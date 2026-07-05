@@ -34,15 +34,18 @@ NOTES_PATH = Path(__file__).parent.parent / "docs" / "NOTES.md"
 def get_logs(topic: str | None = None) -> str:
     """Return the project's detailed work log. Gated behind logs:read.
 
-    If `topic` is given, only returns log entries whose heading or body
-    mention it (case-insensitive substring match), instead of the whole file.
+    If `topic` is given, only returns log entries whose *heading* mentions
+    it (case-insensitive substring match), instead of the whole file.
+    Matching against headings only, not full section bodies, keeps this
+    selective -- a broad term like "scope" appears in nearly every entry's
+    body text, which would defeat the point of a focused excerpt.
     """
     text = NOTES_PATH.read_text()
     if not topic:
         return text
 
     sections = re.split(r"\n(?=## )", text)
-    matches = [s for s in sections if topic.lower() in s.lower()]
+    matches = [s for s in sections if topic.lower() in s.split("\n", 1)[0].lower()]
     if not matches:
         return f"No log entries found matching topic: {topic!r}"
     return "\n\n".join(matches)
