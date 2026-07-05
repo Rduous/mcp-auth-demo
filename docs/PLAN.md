@@ -93,7 +93,7 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 - [x] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo. Live at `mcp-auth-server-06y0.onrender.com` (renamed by Render — `mcp-auth-server` was taken) and `mcp-auth-authserver.onrender.com`. Also had to add `plan: free` explicitly (Blueprint's `plan` field defaults to the paid `starter` tier if unset) and per-service `buildFilter`s so an unrelated commit to one service's directory doesn't redeploy the other.
 - [x] Point `RESOURCE_URI`/`ISSUER` env vars at the real `*.onrender.com` hostnames Render assigns — done; `RESOURCE_URI` needed the `-06y0` suffix Render actually assigned, not the plain requested name.
 - [x] Smoke test end to end against the real URLs — 401+PRM curl chain confirmed first, then a full `client/main.py get-time` run against the live deployment (real browser consent, real PKCE, real token). Hit one real bug along the way: `421 Misdirected Request` from FastMCP's own DNS-rebinding protection defaulting to loopback-only allowed hosts — fixed in `server/main.py` (see NOTES.md). Both `get-time` and `probe get-time` now return clean `RESULT: OK` against the deployed server.
-- [ ] Note the cold-start caveat in the write-up in case a grader's client has a short timeout
+- [x] Note the cold-start caveat in the write-up in case a grader's client has a short timeout — added to `WRITEUP.md`'s hosting paragraph and `README.md`'s "Just running the client" section
 
 ---
 
