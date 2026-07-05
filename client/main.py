@@ -92,14 +92,37 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence the default request logging
 
 
+_background_tasks: set[asyncio.Task] = set()
+
+
+async def _click_confirm_link(url: str) -> None:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+        try:
+            await client.get(url)
+        except httpx.HTTPError:
+            # Best-effort -- a real problem here surfaces as the loopback
+            # callback never arriving (handle_callback keeps waiting)
+            # rather than as an exception anyone here could usefully catch.
+            pass
+
+
 async def _auto_consent(auth_url: str, choice: str) -> None:
     """Drive the demo consent screen ourselves via plain HTTP instead of a
     real browser -- safe because that screen is static HTML with no JS or
     session state (confirmed in TESTING_STRATEGY.md). Walks the same links
-    a human would click, then lets httpx follow the resulting redirect
-    straight into our own already-listening loopback callback server.
+    a human would click, then fires the resulting redirect off in the
+    background rather than awaiting it.
+
+    That last part matters: the SDK only starts listening on our loopback
+    callback server *after* this function (standing in for redirect_handler)
+    returns -- exactly mirroring how a real browser works, since
+    webbrowser.open() also returns immediately rather than waiting for a
+    human to finish clicking through. Awaiting the final redirect-follow
+    request here ourselves would deadlock: nothing would be listening on
+    the loopback port yet. The pending TCP connection queues safely at the
+    OS level until callback_handler starts accepting.
     """
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30) as client:
         page = await client.get(auth_url)
         page.raise_for_status()
 
@@ -118,8 +141,10 @@ async def _auto_consent(auth_url: str, choice: str) -> None:
             raise RuntimeError(f"No consent-screen link found for MCP_AUTH_CONSENT={choice!r}")
 
         base = f"{urlparse(auth_url).scheme}://{urlparse(auth_url).netloc}"
-        response = await client.get(base + link)
-        response.raise_for_status()
+
+    task = asyncio.create_task(_click_confirm_link(base + link))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
