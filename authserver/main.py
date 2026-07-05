@@ -34,6 +34,12 @@ SCOPE_CHOICES = {
     # one of Authlete's built-in default scopes -- satisfies neither of our
     # gated tools' requirements, so it still triggers a real 403.
     "Sign in with unrelated scope (email) -- expect failure": "email",
+    # Combined with mcp:tools rather than requested alone, so the resulting
+    # token is actually usable against get_time -- Authlete's per-scope
+    # token-duration override takes the *shortest* duration among all
+    # granted scopes, so mcp:tools stays full-length while this scope's
+    # short override (see NOTES.md) collapses the whole token's lifetime.
+    "Sign in with mcp:tools + short-lived scope -- test expiration": "mcp:tools short-lived",
 }
 
 # A resource this MCP server does not recognize -- for the "wrong audience"
@@ -119,7 +125,10 @@ async def wrong_resource(request):
 async def confirm(request):
     ticket = request.query_params["ticket"]
     scope = request.query_params.get("scope", "")
-    scopes = [scope] if scope else []
+    # Split on whitespace (RFC 6749 §3.3 scope format) rather than treating
+    # the whole param as one scope -- needed now that a choice can request
+    # more than one scope at once (see the short-lived combo above).
+    scopes = scope.split() if scope else []
     print(f"[authserver] DEBUG /authorize/confirm ticket={ticket!r} raw scope param={scope!r} scopes sent to issue={scopes!r}")
 
     issue_result = await authlete_post(
@@ -133,16 +142,19 @@ async def confirm(request):
 async def token(request):
     form = dict(await request.form())
     client_id = form.pop("client_id", None)
+    print(f"[authserver] DEBUG /token form={form!r} client_id={client_id!r}")
 
     token_result = await authlete_post(
         "auth/token",
         {"clientId": client_id, "parameters": urlencode(form)},
     )
+    print(f"[authserver] DEBUG /token token_result={token_result!r}")
     status = 200 if token_result.get("action") == "OK" else 400
     try:
         content = json.loads(token_result["responseContent"])
     except (KeyError, json.JSONDecodeError):
         content = {"error": "server_error", "error_description": token_result.get("resultMessage")}
+    print(f"[authserver] DEBUG /token responseContent parsed={content!r}")
     return JSONResponse(content, status_code=status)
 
 
