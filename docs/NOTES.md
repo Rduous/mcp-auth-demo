@@ -107,3 +107,10 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 
 - Added `get_logs` (`server/main.py`), gated on `logs:read` in `server/scope_gate.py`. Reads and returns `docs/NOTES.md` verbatim — the in-repo, in-band design from `WRITEUP.md`, not the more elaborate externally-hosted version considered and paused earlier.
 - Verified real differentiation, not just "some scope works for everything": a `logs:read`-only token succeeds on `get_logs` and gets a genuine `403 insufficient_scope` on `get_time`.
+
+## 2026-07-04 — Rewrote client as a real CLI; a scope-selection quirk explained
+
+- `client/main.py` was a hardcoded single-purpose script since Phase 1 — rewrote it as a `click`-based CLI (`get-time`, `get-logs --topic`) so it's actually usable by an outside agent, not just our own testing.
+- Tried an optimization: set `client_metadata.scope` per-tool before each call, to request only the needed scope and skip a step-up round trip. Doesn't work, and it's not a bug — `session.initialize()` triggers the *first* `401` before the client has chosen which tool to call, so the SDK's scope-selection fallback has no tool-specific hint yet and requests the AS's full advertised `scopes_supported` instead (both scopes, always). Removed the dead optimization rather than leave misleading code behind.
+- Consequence: with our no-op auto-approve AS, the first token issued in normal CLI use is now always fully-scoped — step-up won't naturally trigger through the CLI anymore, since nothing comes back under-scoped to begin with. (Already proven working in Phase 5 via the consent picker's deliberately-restricted scope choices; this doesn't undo that, just means the CLI itself won't organically demonstrate it.)
+- Added real visibility instead: the client now prints which scope is actually being requested on each authorization attempt, and explicitly labels a second attempt within one call as "step-up re-authorization" rather than leaving it to be inferred from a raw URL.

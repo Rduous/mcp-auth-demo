@@ -1,11 +1,9 @@
-# TODO: this is a throwaway script for Phase 1's plumbing check. Once we
-# settle the CLI shape (one-shot vs. login+call), rewrite this as a proper
-# CLI tool (click) that handles auth, not just a hardcoded tool call.
 import asyncio
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import click
 from mcp import ClientSession
 from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
@@ -13,6 +11,13 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAu
 
 SERVER_URL = "http://127.0.0.1:8000/mcp"
 CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
+
+# NOTE: it's tempting to set client_metadata.scope per-tool to request only
+# what's needed and avoid a step-up round trip -- doesn't work. The first
+# 401 happens at session.initialize(), before the client has chosen a tool
+# to call, so the SDK's scope-selection fallback (no tool-specific hint
+# available yet) requests the AS's full advertised scopes_supported instead
+# of anything we set locally. Not worth fighting; see NOTES.md.
 
 
 class InMemoryTokenStorage(TokenStorage):
@@ -45,16 +50,21 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence the default request logging
 
 
-async def handle_redirect(auth_url: str) -> None:
-    print(f"Opening browser for authorization:\n{auth_url}")
-    webbrowser.open(auth_url)
+async def call_tool(tool_name: str, arguments: dict) -> str:
+    attempt_count = 0
 
+    async def handle_redirect(auth_url: str) -> None:
+        nonlocal attempt_count
+        attempt_count += 1
+        scope = parse_qs(urlparse(auth_url).query).get("scope", ["(none)"])[0]
+        label = "Step-up re-authorization" if attempt_count > 1 else "Authorization"
+        print(f"{label} (attempt {attempt_count}) -- requesting scope: {scope}")
+        webbrowser.open(auth_url)
 
-async def main():
     # Loopback server on an OS-assigned ephemeral port. Our CIMD doc only
     # registers a *portless* redirect_uri (http://127.0.0.1/callback) --
-    # this only works if the AS ignores the port for loopback addresses,
-    # per RFC 8252 section 7.3. Untested until now.
+    # this only works because the AS ignores the port for loopback addresses,
+    # per RFC 8252 section 7.3 (confirmed working).
     callback_server = HTTPServer(("127.0.0.1", 0), _CallbackHandler)
     callback_server.callback_query = None
     port = callback_server.server_address[1]
@@ -78,7 +88,6 @@ async def main():
             token_endpoint_auth_method="none",
             grant_types=["authorization_code", "refresh_token"],
             response_types=["code"],
-            scope="mcp:tools",
         ),
         storage=InMemoryTokenStorage(),
         redirect_handler=handle_redirect,
@@ -89,9 +98,28 @@ async def main():
     async with streamablehttp_client(SERVER_URL, auth=oauth_auth) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            result = await session.call_tool("get_time", {})
-            print(result.content[0].text)
+            result = await session.call_tool(tool_name, arguments)
+            return result.content[0].text
+
+
+@click.group()
+def cli():
+    """MCP auth demo client -- discovers the AS, authenticates via CIMD, calls a protected tool."""
+
+
+@cli.command("get-time")
+def get_time_cmd():
+    """Tell me the time."""
+    print(asyncio.run(call_tool("get_time", {})))
+
+
+@cli.command("get-logs")
+@click.option("--topic", default=None, help="Only return log entries mentioning this topic.")
+def get_logs_cmd(topic):
+    """Tell me more about [topic] -- reads the project's detailed work log."""
+    arguments = {"topic": topic} if topic else {}
+    print(asyncio.run(call_tool("get_logs", arguments)))
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli()

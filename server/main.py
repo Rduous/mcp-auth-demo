@@ -1,3 +1,4 @@
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,9 +31,21 @@ NOTES_PATH = Path(__file__).parent.parent / "docs" / "NOTES.md"
 
 
 @mcp.tool()
-def get_logs() -> str:
-    """Return the project's detailed work log. Gated behind logs:read."""
-    return NOTES_PATH.read_text()
+def get_logs(topic: str | None = None) -> str:
+    """Return the project's detailed work log. Gated behind logs:read.
+
+    If `topic` is given, only returns log entries whose heading or body
+    mention it (case-insensitive substring match), instead of the whole file.
+    """
+    text = NOTES_PATH.read_text()
+    if not topic:
+        return text
+
+    sections = re.split(r"\n(?=## )", text)
+    matches = [s for s in sections if topic.lower() in s.lower()]
+    if not matches:
+        return f"No log entries found matching topic: {topic!r}"
+    return "\n\n".join(matches)
 
 
 if __name__ == "__main__":
