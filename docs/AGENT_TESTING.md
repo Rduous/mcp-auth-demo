@@ -1,13 +1,22 @@
 # Agent-driven scenario verification
 
 **Status: partially implemented.** File-backed token storage, the `probe`
-subcommand, and structured `RESULT:` output all exist in
-[client/main.py](../client/main.py) now. Still missing: the `revoke`
-subcommand + `authserver`'s `/revoke` route (Scenario 7), and the
-`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` headless consent driver
-(Scenarios 4-8 currently still need a human clicking the real consent
-screen). See [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for why it's shaped
-this way.
+subcommand, structured `RESULT:` output, and a production-by-default
+`SERVER_URL` all exist in [client/main.py](../client/main.py) now. Still
+missing: the `revoke` subcommand + `authserver`'s `/revoke` route
+(Scenario 7), and the `MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` headless
+consent driver (Scenarios 4-8 currently still need a human clicking the
+real consent screen). See [TESTING_STRATEGY.md](TESTING_STRATEGY.md) for
+why it's shaped this way.
+
+**Important**: every command below runs with no flags, which means it hits
+the **live, deployed** `mcp-auth-server`/`mcp-auth-authserver` on Render by
+default — never a local server. That's deliberate: the agent has no access
+to `server`/`authserver` at all, not even a local copy of them running
+somewhere it could theoretically inspect. `client/main.py --local ...`
+exists purely as a faster dev-loop convenience for whoever is *building*
+this project — it is not part of the agent's toolkit and shouldn't appear
+in anything below.
 
 ## Who this is for
 
@@ -23,10 +32,8 @@ underspecified — stop and flag it rather than reaching around the client.
 ## Prerequisites
 
 - Python env set up per [README.md](../README.md) (`venv` + `requirements.txt`).
-- `server` and `authserver` already running and reachable at whatever
-  `SERVER_URL`/AS discovery `client/main.py` currently points at (local
-  Docker Compose or the deployed Render URLs — not something you start,
-  stop, or configure).
+- Nothing to start, stop, or configure server-side — `client/main.py`
+  defaults to the live Render deployment, which is already running.
 - One-time Authlete console setup for Scenario 8 only (expiration) — see
   that scenario's note. Everything else needs no console changes.
 
@@ -38,6 +45,7 @@ underspecified — stop and flag it rather than reaching around the client.
 | `python client/main.py get-logs [--topic X]` | Calls `get_logs` (needs `logs:read`). Same auto-step-up behavior. |
 | `python client/main.py revoke` | Revokes the currently-stored access token via the AS's `/revoke` endpoint. Requires a token already staged. |
 | `python client/main.py probe <get-time\|get-logs>` | Calls the tool using the stored token **without** the SDK's auto-reauth/step-up healing — a bad token surfaces as a clean, unmasked failure instead of being silently repaired. Requires a token already staged; fails fast with a clear message if none exists. |
+| `--local` (group-level flag, e.g. `python client/main.py --local get-time`) | Points at `127.0.0.1` instead of the deployed Render service. **Not for agent use** — dev-loop convenience only; every scenario below assumes it's omitted. |
 
 | Env var | Meaning |
 |---|---|

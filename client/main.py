@@ -13,7 +13,12 @@ from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAuthToken
 
-SERVER_URL = "http://127.0.0.1:8000/mcp"
+# Production is the default -- this client's real audience is a grader (or
+# an agent acting on their behalf) who only ever runs this file, with no
+# access to the two servers or their logs, against the actually-deployed
+# services. --local exists purely for our own faster dev-loop iteration.
+PROD_SERVER_URL = "https://mcp-auth-server-06y0.onrender.com/mcp"
+LOCAL_SERVER_URL = "http://127.0.0.1:8000/mcp"
 CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
 
 # Persisted across separate CLI invocations (not just within one process) --
@@ -83,7 +88,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         pass  # silence the default request logging
 
 
-async def call_tool(tool_name: str, arguments: dict) -> str:
+async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
     attempt_count = 0
 
     async def handle_redirect(auth_url: str) -> None:
@@ -115,7 +120,7 @@ async def call_tool(tool_name: str, arguments: dict) -> str:
                 return params["code"][0], params.get("state", [None])[0]
 
     oauth_auth = OAuthClientProvider(
-        server_url=SERVER_URL,
+        server_url=server_url,
         client_metadata=OAuthClientMetadata(
             redirect_uris=[redirect_uri],
             token_endpoint_auth_method="none",
@@ -128,14 +133,14 @@ async def call_tool(tool_name: str, arguments: dict) -> str:
         client_metadata_url=CIMD_URL,
     )
 
-    async with streamablehttp_client(SERVER_URL, auth=oauth_auth) as (read, write, _):
+    async with streamablehttp_client(server_url, auth=oauth_auth) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, arguments)
             return result.content[0].text
 
 
-async def probe_tool(tool_name: str, arguments: dict) -> str:
+async def probe_tool(tool_name: str, arguments: dict, server_url: str) -> str:
     """Call a tool with whatever token is currently on disk, using a plain
     static bearer header instead of OAuthClientProvider -- deliberately no
     auto-reauth/step-up healing. That healing is exactly right for
@@ -148,7 +153,7 @@ async def probe_tool(tool_name: str, arguments: dict) -> str:
         raise RuntimeError(f"No stored token in {STATE_FILE} -- run get-time or get-logs first to stage one.")
 
     headers = {"Authorization": f"Bearer {tokens.access_token}"}
-    async with streamablehttp_client(SERVER_URL, headers=headers) as (read, write, _):
+    async with streamablehttp_client(server_url, headers=headers) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.call_tool(tool_name, arguments)
@@ -184,33 +189,43 @@ def _run(coro) -> None:
 
 
 @click.group()
-def cli():
+@click.option(
+    "--local",
+    is_flag=True,
+    help="Hit the local dev server (127.0.0.1) instead of the deployed Render service.",
+)
+@click.pass_context
+def cli(ctx, local):
     """MCP auth demo client -- discovers the AS, authenticates via CIMD, calls a protected tool."""
+    ctx.obj = LOCAL_SERVER_URL if local else PROD_SERVER_URL
 
 
 @cli.command("get-time")
-def get_time_cmd():
+@click.pass_context
+def get_time_cmd(ctx):
     """Tell me the time."""
-    _run(call_tool("get_time", {}))
+    _run(call_tool("get_time", {}, ctx.obj))
 
 
 @cli.command("get-logs")
 @click.option("--topic", default=None, help="Only return log entries mentioning this topic.")
-def get_logs_cmd(topic):
+@click.pass_context
+def get_logs_cmd(ctx, topic):
     """Tell me more about [topic] -- reads the project's detailed work log."""
     arguments = {"topic": topic} if topic else {}
-    _run(call_tool("get_logs", arguments))
+    _run(call_tool("get_logs", arguments, ctx.obj))
 
 
 @cli.command("probe")
 @click.argument("tool", type=click.Choice(["get-time", "get-logs"]))
 @click.option("--topic", default=None, help="Only used with get-logs.")
-def probe_cmd(tool, topic):
+@click.pass_context
+def probe_cmd(ctx, tool, topic):
     """Call TOOL with the currently stored token, bypassing auto-reauth --
     the way to verify a revoked/expired/mis-scoped token cleanly."""
     tool_name = tool.replace("-", "_")
     arguments = {"topic": topic} if (tool_name == "get_logs" and topic) else {}
-    _run(probe_tool(tool_name, arguments))
+    _run(probe_tool(tool_name, arguments, ctx.obj))
 
 
 if __name__ == "__main__":
