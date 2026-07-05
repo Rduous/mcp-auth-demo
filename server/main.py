@@ -2,15 +2,30 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import uvicorn
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from auth import RESOURCE_URI, AuthleteTokenVerifier
 from scope_gate import ScopeEnforcementMiddleware
+
+# FastMCP's default DNS-rebinding protection only allows loopback Host
+# headers (127.0.0.1/localhost/::1) -- correct for a server that's normally
+# run locally, but it silently 421s every request once actually deployed
+# under a real hostname. Derive the extra allowed host from RESOURCE_URI
+# (already the canonical source of truth for this service's
+# externally-visible identity) rather than hardcoding the Render hostname
+# a second time.
+_resource = urlparse(RESOURCE_URI)
+_transport_security = TransportSecuritySettings(
+    allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", _resource.netloc],
+    allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*", f"{_resource.scheme}://{_resource.netloc}"],
+)
 
 mcp = FastMCP(
     "mcp-auth-demo",
@@ -21,6 +36,7 @@ mcp = FastMCP(
         issuer_url=os.environ.get("ISSUER", "http://127.0.0.1:8001"),
         resource_server_url=RESOURCE_URI,
     ),
+    transport_security=_transport_security,
 )
 
 
