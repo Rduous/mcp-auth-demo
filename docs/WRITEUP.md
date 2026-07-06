@@ -30,6 +30,7 @@
 
 When I work with an agent, I use these principles:
 
+- **Maintain project context via version-controlled artifacts** — `PLAN.md`, `NOTES.md`, and similar checked-in documents are the source of truth for the state of the work, not conversational memory.
 - **Treat claims as hypotheses, not facts** — including my own. When something "doesn't exist" or "should work," ask for the mechanism before accepting it.
 - **Paraphrase before code exists** — restate a plan or design back and invite correction, since a misunderstanding caught before implementation is nearly free.
 - **Settle disagreements with evidence, not seniority** — a wrong diagnosis, mine or the agent's, gets resolved by a log line or test output, not by who proposed it first.
