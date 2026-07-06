@@ -2,13 +2,19 @@
 
 An MCP (Model Context Protocol) resource server and CIMD-based client CLI, implementing the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization): OAuth 2.1 + PKCE, Protected Resource Metadata discovery, CIMD client identity, resource-parameter audience binding, and scope enforcement with step-up auth.
 
+## Evaluation TL;DR
+
+- **Run it** (no setup beyond `pip install`, hits the live deployed services): `python3 client/main.py get-time`
+- **Verify it** — 8 scripted scenarios (happy path, scope differentiation, step-up succeed/exhaust, wrong audience, revocation, expiration), each producing one `RESULT: OK/ERROR` line, no browser or human needed: see [docs/AGENT_TESTING.md](docs/AGENT_TESTING.md).
+- **Read the design reasoning and POV**: [docs/WRITEUP.md](docs/WRITEUP.md).
+
 ## Layout
 
 - `server/` — MCP resource server (official `mcp` SDK / FastMCP, streamable HTTP). Publishes Protected Resource Metadata, validates audience-bound tokens via Authlete introspection, enforces scope on protected tools.
 - `authserver/` — thin AS-frontend wrapping Authlete's API (`/authorize`, `/token`, `/.well-known/oauth-authorization-server`) — Authlete itself has no hosted login/consent UI.
 - `client/` — MCP client CLI. Discovers the server's AS via `401` + PRM, authenticates via CIMD + PKCE, calls tools with the resulting token.
 - `cimd/` — Static CIMD metadata document (hosted at a public HTTPS URL) that identifies the client.
-- `docs/` — [PLAN.md](docs/PLAN.md) (phase checklist), [NOTES.md](docs/NOTES.md) (work log), [WRITEUP.md](docs/WRITEUP.md) (design decisions), [BACKGROUND.md](docs/BACKGROUND.md) (spec prep notes).
+- `docs/` — [WRITEUP.md](docs/WRITEUP.md) (design decisions, agent interaction, POV), [AGENT_TESTING.md](docs/AGENT_TESTING.md) (scripted verification scenarios), [PLAN.md](docs/PLAN.md) (phase checklist), [NOTES.md](docs/NOTES.md) (work log), [TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) (why the test harness is shaped the way it is), [BACKGROUND.md](docs/BACKGROUND.md) (spec prep notes), [session_log.md](docs/session_log.md) (human-written summary of agent collaboration).
 
 ## Setup
 
@@ -62,4 +68,4 @@ Quick sanity check either way: `curl http://127.0.0.1:8000/healthz` and `curl ht
 
 ## Status
 
-Core auth flow (discovery, CIMD, PKCE, audience binding, scope enforcement + step-up) is complete and containerized; see [docs/PLAN.md](docs/PLAN.md) for the current phase and what's still open (Render deployment, agent-verifiable test scenarios).
+Complete: auth flow (discovery, CIMD, PKCE, audience binding, scope enforcement + step-up), containerization, Render deployment, and the agent-verifiable test suite (see [docs/AGENT_TESTING.md](docs/AGENT_TESTING.md)) are all built and passing against production. See [docs/PLAN.md](docs/PLAN.md) for the phase-by-phase history; only Phase 8 (real sign-in via Google SSO, currently a labeled no-op) and Phase 9 (optional AWS/Terraform, portfolio-only) remain open.

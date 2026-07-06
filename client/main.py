@@ -15,7 +15,7 @@ from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
 from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAuthToken
 
-# Production is the default -- this client's real audience is a grader (or
+# Production is the default -- this client's real audience is an evaluator (or
 # an agent acting on their behalf) who only ever runs this file, with no
 # access to the two servers or their logs, against the actually-deployed
 # services. --local exists purely for our own faster dev-loop iteration.

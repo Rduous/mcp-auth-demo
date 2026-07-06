@@ -38,7 +38,7 @@ MCP lets an AI client (Claude, an IDE, an agent) talk to external tools/data thr
 
 Ephemeral per auth attempt — not a persistent key.
 
-**Resource parameter / audience binding (RFC 8707)** — every authorization and token request MUST include a `resource` parameter identifying the target MCP server's canonical URI. Servers MUST validate tokens were issued for them specifically. This is the fix for "confused deputy" — a token meant for server A can't be replayed against server B. Easy to omit in a single-server demo since nothing visibly breaks — but it's graded/tested behavior, so verify the `aud` claim explicitly.
+**Resource parameter / audience binding (RFC 8707)** — every authorization and token request MUST include a `resource` parameter identifying the target MCP server's canonical URI. Servers MUST validate tokens were issued for them specifically. This is the fix for "confused deputy" — a token meant for server A can't be replayed against server B. Easy to omit in a single-server demo since nothing visibly breaks — but it's evaluated/tested behavior, so verify the `aud` claim explicitly.
 
 **Token passthrough is forbidden.** If an MCP server calls a downstream API on the user's behalf, it must use its own credentials for that call — never forward the token it received from the client. Enforcement is "the operator must follow the spec correctly," backstopped structurally by audience binding (a passed-through token gets rejected elsewhere as having the wrong audience).
 
@@ -86,7 +86,7 @@ Flow: client calls MCP server → `401` + AS location → client authorizes agai
 - Actually gate the protected tool on a scope, and have a way to *demonstrate* a 403/insufficient_scope, not just claim it works.
 
 **Discovery order**
-- Client should discover the AS via the MCP server's `401` + PRM, not hardcode AS endpoints — that's part of what's being graded.
+- Client should discover the AS via the MCP server's `401` + PRM, not hardcode AS endpoints — that's part of what's being evaluated.
 
 **Likely agent-specific mistakes**
 - Defaulting to Dynamic Client Registration instead of CIMD (more represented in older training data)
@@ -101,7 +101,7 @@ Flow: client calls MCP server → `401` + AS location → client authorizes agai
 
 Well-formed for testing "read a spec, build the full loop, make sane build-vs-buy calls." Explicit requirements: server as resource server (PRM, audience validation, scope enforcement), client as CIMD-driven single-command CLI. Deliberately open: which AS to use (biggest fork in the road), what the protected tool actually does (keep trivial — real signal is scope enforcement, not tool logic), and how literally to take "single command."
 
-In-scope/load-bearing from this conversation: discovery, resource parameter, PKCE, CIMD mechanics, scope/step-up handling, token passthrough prohibition. Background/context, not directly graded: session caching mechanics, token lifecycle nuances — good material for the "POV on when this pattern makes sense" section of the write-up, not something to over-engineer.
+In-scope/load-bearing from this conversation: discovery, resource parameter, PKCE, CIMD mechanics, scope/step-up handling, token passthrough prohibition. Background/context, not directly evaluated: session caching mechanics, token lifecycle nuances — good material for the "POV on when this pattern makes sense" section of the write-up, not something to over-engineer.
 
 ## Write-up logging approach
 
@@ -116,4 +116,4 @@ Public repo (no private repos on your plan) holds the short required write-up in
 
 - Keep the *required* write-up ungated — gate only the extended/raw logs.
 - Prefer returning the log content directly from the tool call (in-band) over returning a Google Docs link — a shareable link can leak past the scope check once someone has it; in-band content keeps enforcement exactly where the assignment is testing it.
-- Call this out explicitly in the write-up rather than leaving it for the grader to stumble onto.
+- Call this out explicitly in the write-up rather than leaving it for the evaluator to stumble onto.

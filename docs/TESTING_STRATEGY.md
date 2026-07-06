@@ -1,17 +1,24 @@
 # Testing strategy: agent-verifiable scenarios
 
-Design record for how this project gets verified by an automated grading
+Design record for how this project gets verified by an automated evaluation
 agent instead of (or alongside) unit tests. Operational counterpart —
 what the agent actually runs — is [AGENT_TESTING.md](AGENT_TESTING.md).
-Status: design agreed, implementation not yet started.
+Status: design agreed, fully implemented and verified against production
+(see Phase 10 in [PLAN.md](PLAN.md)). Kept as a design record, not a live
+TODO list — the "Decisions" and "Rejected alternatives" below are the
+useful, load-bearing part now.
 
 ## Problem
 
-Grading here leans on an agent driving the real system and observing real
-behavior, not a unit-test suite. Per [PHASE7_PLAN.md](PHASE7_PLAN.md), that
-agent only ever gets `client/main.py` — never `server`/`authserver`
-themselves, their processes, or their logs. Two things stood in the way of
-that being verifiable at all:
+Chatting with Tom gave me a sense that unit testing is not the preferred
+approach at GA, so I chose not to implement a unit test suite. Instead I
+focused on writing instructions for an agent to evaluate the system, using
+testing scenarios and observable behavior to judge the system's
+correctness. I may have over-indexed on one conversation, but it was a fun
+learning process! Per [PHASE7_PLAN.md](PHASE7_PLAN.md), that agent only
+ever gets `client/main.py` — never `server`/`authserver` themselves, their
+processes, or their logs. Two things stood in the way of that being
+verifiable at all:
 
 1. Several required scenarios (token revocation, expiration, wrong
    audience, exhausted step-up) don't arise from normal client use — they
@@ -35,7 +42,7 @@ display requirement to solve a problem that doesn't exist here.
 
 | Decision | Choice | Why |
 |---|---|---|
-| Where hooks live | Extend `client/main.py` in place, all additions off by default | It's the one artifact the agent is guaranteed to run (Phase 7's framing). A separate harness script would need to import or duplicate its OAuth setup anyway, and risks the doc describing behavior the actual graded artifact doesn't have. |
+| Where hooks live | Extend `client/main.py` in place, all additions off by default | It's the one artifact the agent is guaranteed to run (Phase 7's framing). A separate harness script would need to import or duplicate its OAuth setup anyway, and risks the doc describing behavior the actual evaluated artifact doesn't have. |
 | Headless consent | New env vars (`MCP_AUTH_CONSENT`, `MCP_AUTH_CONSENT_RETRY`) select which link the client "clicks" itself via `httpx`, instead of `webbrowser.open` | No new server behavior, no browser automation dependency. Unset → today's real-browser demo path, unchanged. |
 | Cross-invocation state | Swap `InMemoryTokenStorage` for a file-backed `TokenStorage` | Multi-step scenarios (stage a token, revoke it, retry) need the token to survive across separate CLI invocations — it currently doesn't. Also a general CLI-quality fix, not test-only. |
 | Revocation staging | Real `/revoke` endpoint on `authserver`, wrapping Authlete's native `/auth/revocation` (RFC 7009) | Standard OAuth capability, not a test backdoor. Safe to expose publicly: a caller can only revoke a token it already holds, same trust model as `/token` already has for a public client. |
@@ -61,7 +68,7 @@ display requirement to solve a problem that doesn't exist here.
 - **Separate test-harness script** — would duplicate or import
   `client/main.py`'s OAuth setup, adds a second entry point that could
   drift from what the doc describes, and cuts against Phase 7's framing
-  that the client is the one thing graders (and their agents) actually run.
+  that the client is the one thing evaluators (and their agents) actually run.
 - **Handing the agent `AUTHLETE_SAT`** so it can revoke/expire tokens
   directly against Authlete's admin API — exactly the credential Phase 7
   already decided never to hand out (single admin-level credential for the
@@ -72,19 +79,16 @@ display requirement to solve a problem that doesn't exist here.
   something to hardcode a sleep against. The per-scope duration override
   makes it deterministic and short instead.
 
-## Open items
+## Open items (resolved)
 
-- **Verify Authlete's `/auth/revocation` API is enabled by default** for
-  this service, rather than gated behind a console toggle (à la the PKCE
-  setting logged in [NOTES.md](NOTES.md)) — don't assume, spike it with a
-  curl test the same way Phase 0 did for introspection before building the
-  `/revoke` route around it.
-- **Confirm the SDK's `streamablehttp_client` accepts a plain `httpx.Auth`
-  (static bearer) in place of `OAuthClientProvider`** for the `probe`
-  subcommand — expected based on the transport signature, not yet verified
-  against the installed `mcp` package version.
-- **Identify the exact exception type** the SDK raises on a terminal
-  (non-recoverable) auth failure, so the `RESULT: ERROR` handler catches
-  that specifically rather than a bare `except Exception`.
-- Implementation itself — none of the client/authserver changes in the
-  Decisions table above are built yet.
+All items below were open questions at design time; each was resolved
+during Phase 10 (see [PLAN.md](PLAN.md) and [NOTES.md](NOTES.md) for the
+concrete findings):
+
+- Authlete's `/auth/revocation` API was confirmed enabled by default —
+  no console toggle needed.
+- The SDK's `streamablehttp_client` does accept a plain `headers=` bearer
+  header in place of `OAuthClientProvider`, used as-is by `probe`.
+- The `RESULT: ERROR` handler catches `BaseExceptionGroup`/`httpx.HTTPStatusError`
+  specifically (see `_describe_error` in [client/main.py](../client/main.py)),
+  not a bare `except Exception`.

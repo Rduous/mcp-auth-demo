@@ -33,18 +33,23 @@ underspecified — stop and flag it rather than reaching around the client.
 - Python env set up per [README.md](../README.md) (`venv` + `requirements.txt`).
 - Nothing to start, stop, or configure server-side — `client/main.py`
   defaults to the live Render deployment, which is already running.
-- One-time Authlete console setup for Scenario 8 only (expiration) — see
-  that scenario's note. Everything else needs no console changes.
 
 ## CLI surface
 
-| Command | Behavior |
-|---|---|
-| `python client/main.py get-time` | Calls `get_time` (needs `mcp:tools`). Full OAuth dance, auto step-up on `403 insufficient_scope`. |
-| `python client/main.py get-logs [--topic X]` | Calls `get_logs` (needs `logs:read`). Same auto-step-up behavior. |
-| `python client/main.py revoke` | Revokes the currently-stored access token via the AS's `/revoke` endpoint. Requires a token already staged. |
-| `python client/main.py probe <get-time\|get-logs>` | Calls the tool using the stored token **without** the SDK's auto-reauth/step-up healing — a bad token surfaces as a clean, unmasked failure instead of being silently repaired. Requires a token already staged; fails fast with a clear message if none exists. |
-| `--local` (group-level flag, e.g. `python client/main.py --local get-time`) | Points at `127.0.0.1` instead of the deployed Render service. **Not for agent use** — dev-loop convenience only; every scenario below assumes it's omitted. |
+Run `python client/main.py --help` (and `python client/main.py <command> --help`)
+to discover the full command surface and its options directly — every
+command and flag is self-documented there, and that's the authoritative,
+always-current source rather than this doc.
+
+Two things `--help` won't tell you, since they're not part of Click's own
+help text:
+
+- **Required scope per tool** — `get_time` needs `mcp:tools`, `get_logs`
+  needs `logs:read`. Both auto-step-up on `403 insufficient_scope` (see the
+  env vars below).
+- **`--local` is not for agent use.** It exists purely as a dev-loop
+  convenience to point at `127.0.0.1` instead of the deployed Render
+  service; every scenario below assumes it's omitted.
 
 | Env var | Meaning |
 |---|---|
@@ -132,9 +137,10 @@ python client/main.py probe get-time                          # expect RESULT: E
 ```
 
 ### 8. Expiration
-**Requires one-time Authlete console setup** (not in git — see
-[TESTING_STRATEGY.md](TESTING_STRATEGY.md) for why): register a scope named
-`short-lived` with a 10-second token-duration override.
+Relies on a `short-lived` scope already registered on the live Authlete
+service, with a 10-second token-duration override (one-time console setup
+done during development — not in git, see [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
+for why). No action needed here; the scope already exists.
 ```bash
 python client/main.py reset
 MCP_AUTH_CONSENT="mcp:tools short-lived" python client/main.py get-time   # expect RESULT: OK

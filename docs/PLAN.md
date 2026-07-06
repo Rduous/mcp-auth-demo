@@ -40,7 +40,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 - [x] Pick a placeholder canonical resource URI for local dev — `http://127.0.0.1:8000/mcp`, in [server/auth.py](../server/auth.py) as `RESOURCE_URI`, not hardcoded elsewhere
 - [x] Server requires a token, returns `401` + PRM pointing at real AS — verified via curl: `401` + `www-authenticate` → `.well-known/oauth-protected-resource/mcp` → names `https://authlete.com/`
-- [x] Client discovers AS from the `401` response (not hardcoded) — **this is graded**. Confirmed via the SDK's `OAuthClientProvider` source: on `401` it discovers Protected Resource Metadata, then the AS's own metadata, before ever attempting authorization. Verified live in Phase 3's testing.
+- [x] Client discovers AS from the `401` response (not hardcoded) — **this is evaluated**. Confirmed via the SDK's `OAuthClientProvider` source: on `401` it discovers Protected Resource Metadata, then the AS's own metadata, before ever attempting authorization. Verified live in Phase 3's testing.
 - [x] **Checkpoint:** decided — call Authlete's `/auth/introspection` (network hop, live revocation check). See [server/auth.py](../server/auth.py) and [session_log.md](session_log.md).
 
 ---
@@ -82,7 +82,7 @@ Stack: Python (official `mcp` SDK for server + client, httpx for direct AS calls
 
 ## Phase 7 — Containerize + host both services (Docker + Render)
 
-Re-scoped from the original "deploy to AWS" plan once we worked out what grading actually requires: graders need to reach `server`/`authserver` asynchronously, without me present — they never run those two themselves (only `client/main.py`, which holds no secret). That's satisfiable for free with Docker + Render, no AWS/Terraform needed. This phase is now the one that actually unblocks async grading, not pure portfolio value — see Phase 9 for where the AWS/Terraform work went.
+Re-scoped from the original "deploy to AWS" plan once we worked out what evaluation actually requires: evaluators need to reach `server`/`authserver` asynchronously, without me present — they never run those two themselves (only `client/main.py`, which holds no secret). That's satisfiable for free with Docker + Render, no AWS/Terraform needed. This phase is now the one that actually unblocks async evaluation, not pure portfolio value — see Phase 9 for where the AWS/Terraform work went.
 
 Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, pair-coding dev loop): [PHASE7_PLAN.md](PHASE7_PLAN.md).
 
@@ -93,7 +93,7 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 - [x] Render: two Web Services (Docker runtime), via a `render.yaml` Blueprint checked into git — `AUTHLETE_SERVICE_ID`/`AUTHLETE_SAT` marked `sync: false` so the values are typed once into Render's dashboard and never appear in the repo. Live at `mcp-auth-server-06y0.onrender.com` (renamed by Render — `mcp-auth-server` was taken) and `mcp-auth-authserver.onrender.com`. Also had to add `plan: free` explicitly (Blueprint's `plan` field defaults to the paid `starter` tier if unset) and per-service `buildFilter`s so an unrelated commit to one service's directory doesn't redeploy the other.
 - [x] Point `RESOURCE_URI`/`ISSUER` env vars at the real `*.onrender.com` hostnames Render assigns — done; `RESOURCE_URI` needed the `-06y0` suffix Render actually assigned, not the plain requested name.
 - [x] Smoke test end to end against the real URLs — 401+PRM curl chain confirmed first, then a full `client/main.py get-time` run against the live deployment (real browser consent, real PKCE, real token). Hit one real bug along the way: `421 Misdirected Request` from FastMCP's own DNS-rebinding protection defaulting to loopback-only allowed hosts — fixed in `server/main.py` (see NOTES.md). Both `get-time` and `probe get-time` now return clean `RESULT: OK` against the deployed server.
-- [x] Note the cold-start caveat in the write-up in case a grader's client has a short timeout — added to `WRITEUP.md`'s hosting paragraph and `README.md`'s "Just running the client" section
+- [x] Note the cold-start caveat in the write-up in case an evaluator's client has a short timeout — added to `WRITEUP.md`'s hosting paragraph and `README.md`'s "Just running the client" section
 
 ---
 
@@ -105,9 +105,9 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 
 ---
 
-## Phase 9 — Migrate to AWS/Terraform (optional, portfolio/interview value only — not required for grading)
+## Phase 9 — Migrate to AWS/Terraform (optional, portfolio/interview value only — not required for evaluation)
 
-Phase 7 (Render) already satisfies the actual grading requirement for free. This phase is purely "show real AWS/Terraform skill" for the follow-up interview — do it only if there's time and interest left over.
+Phase 7 (Render) already satisfies the actual evaluation requirement for free. This phase is purely "show real AWS/Terraform skill" for the follow-up interview — do it only if there's time and interest left over.
 
 Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer) lives in `docs/PHASE9_AWS_PLAN.md` — kept locally as personal reference, deliberately gitignored, **not part of this repo/submission**. Decided: **ECS Fargate**, not EKS/k8s.
 
@@ -122,7 +122,7 @@ Detailed ELI5 step-by-step plan (decisions, ordering, Terraform primer) lives in
 
 ## Phase 10 — Agent-verifiable test scenarios
 
-Grading leans on an agent driving the real system and observing behavior, not a unit-test suite — and per Phase 7, that agent only ever runs `client/main.py`, never `server`/`authserver` or their logs. Several required scenarios (revocation, expiration, exhausted step-up, wrong audience) don't arise from normal client use, so the client itself needs to become a scriptable harness for staging and observing them. Design doc: [TESTING_STRATEGY.md](TESTING_STRATEGY.md). Agent-facing instructions: [AGENT_TESTING.md](AGENT_TESTING.md).
+Evaluation leans on an agent driving the real system and observing behavior, not a unit-test suite — and per Phase 7, that agent only ever runs `client/main.py`, never `server`/`authserver` or their logs. Several required scenarios (revocation, expiration, exhausted step-up, wrong audience) don't arise from normal client use, so the client itself needs to become a scriptable harness for staging and observing them. Design doc: [TESTING_STRATEGY.md](TESTING_STRATEGY.md). Agent-facing instructions: [AGENT_TESTING.md](AGENT_TESTING.md).
 
 - [x] Fix `client/main.py`'s uncaught-exception-on-terminal-auth-failure bug; print structured `RESULT: OK/ERROR ...` lines instead
 - [x] Headless consent driver in `client/main.py` (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY` env vars), off by default — real-browser demo path unchanged when unset. `_auto_consent()` walks the consent screen's own links via `httpx`, no browser needed.

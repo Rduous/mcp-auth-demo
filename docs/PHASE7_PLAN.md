@@ -1,7 +1,7 @@
 # Phase 7 — Containerize + host both services: detailed plan
 
 Re-scoped from an earlier draft of this phase that went straight to AWS/Terraform.
-What grading actually needs is narrower: graders reach `server`/`authserver`
+What evaluation actually needs is narrower: evaluators reach `server`/`authserver`
 asynchronously, without me present. They never run those two services
 themselves — only `client/main.py`, which holds no secret. That's satisfiable
 for free with Docker + Render. The AWS/Terraform work is real, but it's now
@@ -27,15 +27,15 @@ see `authserver/main.py:12-13`, `server/auth.py:7-8`). That's good: it means
 the secret-handling problem is already "give the running container the right
 env vars," not "rewrite how the app reads credentials."
 
-**Why not just share the Authlete credential so graders can run everything
+**Why not just share the Authlete credential so evaluators can run everything
 locally?** `AUTHLETE_SAT` is a single admin-level Bearer credential for your
 whole configured Authlete service — it can mint tokens for any client/subject/
 scope and drive the service's config APIs. It isn't scoped per-user, and
 there's no lightweight way to carve out a narrower one; the only real
-equivalent would be each grader standing up their own Authlete account and
+equivalent would be each evaluator standing up their own Authlete account and
 re-doing every config gotcha already logged in [NOTES.md](NOTES.md) (PKCE
 toggle, scope pre-registration, JWT signing algo). Not "easy to install."
-The good news: it's moot, because graders only ever run the client, never
+The good news: it's moot, because evaluators only ever run the client, never
 these two services.
 
 ---
@@ -169,7 +169,7 @@ randomized one.
   (`server/auth.py`), indistinguishable from "no token" unless you know to
   check this first.
 - **New caveat specific to Render's free tier**: services sleep after ~15 min
-  idle and take ~1 min to cold-start on the next request. If a grader's
+  idle and take ~1 min to cold-start on the next request. If an evaluator's
   client has a short timeout, the very first call might fail before the
   container's even up. Worth one line in the write-up about this, and worth
   trying the flow yourself after a period of idleness to see the real
