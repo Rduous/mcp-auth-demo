@@ -1,5 +1,7 @@
 # MCP Authorization — Design Decisions, Agent Interactions, and a POV
 
+**A note to evaluators on time spent:** I spent more time on this assignment than I was supposed to. I usually work with Gemini, and I got genuinely absorbed exploring what Claude could do. I had fun and didn't want to stop! Thanks for bearing with me here.
+
 ## Design Decisions
 
 **Language:** I chose Python due to its well-supported / easy to use libraries around HTTP servers and MCP. I don't regret it!
