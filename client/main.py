@@ -180,7 +180,9 @@ async def _preload_oauth_metadata(oauth_auth: OAuthClientProvider, as_url: str) 
     own -- it assumes `self.context.oauth_metadata` is already populated
     from an earlier 401 in the *same* OAuthClientProvider instance, and if
     it isn't, falls back to guessing an authorize endpoint off the resource
-    server's own URL, which 404s (see NOTES.md's cross-process step-up entry).
+    server's own URL, which 404s (see NOTES.md's cross-process step-up entry,
+    and AGENT_TESTING.md's Scenario 9, which exercises exactly this path and
+    regresses with a 404 if this function is removed).
 
     That assumption holds for a long-lived client that keeps one
     OAuthClientProvider in memory for a whole session. It doesn't hold for
