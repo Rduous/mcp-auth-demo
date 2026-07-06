@@ -2,7 +2,9 @@
 
 ## Design Decisions
 
-**Language** I chose Python due to its well-supported / easy to use libraries around HTTP servers and MCP. I don't regret it!
+**Language:** I chose Python due to its well-supported / easy to use libraries around HTTP servers and MCP. I don't regret it!
+
+**Two protected tools.** `get_time` just returns the current UTC time — deliberately trivial, since the real signal here is the auth mechanics, not tool logic. `get_logs`, gated behind a different scope (`logs:read`), returns excerpts from this project's own work log (`NOTES.md`), with an optional `--topic` filter — real, useful content, not a placeholder, so the second scope actually gates something worth reading. That log is already public in this repo's git history, so `logs:read` isn't providing real confidentiality; the point is demonstrating the access-control pattern itself — a second scope with a genuinely different permission boundary, enforced the same way as the primary tool. Sample commands pulling specific topics out of it show up throughout the rest of this write-up rather than being repeated here.
 
 **I built on the MCP SDK's own auth support (`TokenVerifier`/`AuthSettings`, `OAuthClientProvider`) rather than hand-rolling discovery, PKCE, and step-up.** That got the prototype up fast, but didn't mean skipping the protocol itself — e.g. `python3 client/main.py get-logs --topic "step-up"` covers a case where fixing a bug meant reading the SDK's source down to a missing header field. It's also an easy swap later, if requested by reviewers; and plenty of real authorization logic — introspection, audience binding, per-tool scope enforcement — is already separate, hand-written code in `server/auth.py` and `server/scope_gate.py`.
 
@@ -14,9 +16,7 @@
 
 **I don't trust the AS's own audience check — the resource server verifies it independently.** Authlete's introspection only enforces resource matching when a scope check rides along in the same call; called the way our resource server actually calls it, it reports bound resources but won't reject a mismatch on its own. Rather than depend on that inconsistency, the resource server checks audience itself, every time.
 
-**Per-tool scope enforcement: one server exposing multiple tools, not scope tiers split across servers.** The assignment described "an MCP server" and "your protected MCP tool" in the singular, and MCP's client-server relationship is 1:1 per session — so middleware inspects each tool call independently, rather than running separate FastMCP instances per scope tier. That keeps step-up (call a tool, get `403`, re-authenticate narrowly, retry) inside one continuous session, matching how a real deployment would behave.
-
-**An "extended log" tool exercises scope-gating with real content.** It returns excerpts of `NOTES.md`, already public in this repo's git history, so `logs:read` isn't enforcing any confidentiality — the point is demonstrating the access-control pattern itself: a second scope, a genuinely different permission boundary, enforced the same way as the primary tool.
+**Two tools, one MCP server — not scope tiers split across separate servers.** The MCP SDK forced this decision, not the spec: FastMCP's `streamable_http_app()` wraps the entire session in one route behind a single flat `required_scopes` list, with no native per-tool granularity. Rather than run a separate FastMCP instance per scope tier — matching the SDK's own structure, but splitting `get_time` and `get_logs` across two servers — I wrote middleware that inspects each tool call independently and checks that specific tool's required scope. That keeps step-up (call a tool, get `403`, re-authenticate narrowly, retry) inside one continuous session, and it happens to match the assignment's own wording too ("an MCP server," "your protected MCP tool," singular).
 
 **Hosting: Docker on Render's free tier, with one caveat.** Both services deploy via a Render Blueprint (`render.yaml`) to real, always-on HTTPS URLs, so evaluation doesn't depend on me running anything locally. **NOTE:** Free-tier services sleep after ~15 minutes idle and take under a minute to wake — a slow or timed-out first request is a cold start, not a broken deployment; retry.
 
@@ -39,7 +39,7 @@ When I work with an agent, I use these principles:
 - **Gate risk explicitly** — separate authorization for low-risk vs. high-risk actions (commit vs. push), keep secrets out of shared context, draw a clear line on who edits a file mid-flight.
 - **Verify empirically rather than trust a status report** — run it myself, capture raw output, and spot-check a checked box before building on it.
 
-The result is a project shaped by my own understanding and judgment, not the agent's defaults. It's a solid POC, backed by a test suite that's easy to run and makes verification and regression detection straightforward. I hope it also gives reviewers real insight into what they're evaluating, 
+The result is a project shaped by my own understanding and judgment, not the agent's defaults. It's a solid POC, verified by a test suite that's easy to run and makes regression detection straightforward. I hope it also gives reviewers real insight into what they're evaluating, 
 
 My progress with the agent wasn't monotonic. I explore the problem space at the same time as I ask the agent to write code, rather than fully resolving direction first — which sometimes produces wrong turns, not just clean forward motion. The clearest example: I had the agent write a detailed AWS/Terraform plan (Fargate vs. EKS, ALB routing, TLS) before the real constraint — grader access without me present, cost — had surfaced, and most of it got discarded in favor of Docker+Render. That's real token spend that didn't survive. But I think the exploratory style is worth it: it's how I actually learn the material, and the wrong AWS-first instinct only became visible because I'd built it out far enough to compare against the real constraint once it emerged. Messier than a straight line doesn't mean less directed — the direction-finding happened partly through building, not only before it.
 
