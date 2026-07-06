@@ -128,6 +128,20 @@ MCP_AUTH_CONSENT=wrong-resource python client/main.py get-time
 Expect: `RESULT: ERROR 401 ...` — token minted for a different resource must
 be rejected.
 
+**Why this one is easy to silently break:** the `wrong-resource` consent
+link doesn't override scope at issue time, and a fresh session's first
+authorization attempt always requests the AS's full advertised scope list
+(see `NOTES.md`) — so this token actually carries a *valid* `mcp:tools`
+scope, just bound to the wrong resource. That's precisely the shape that
+exposed a real bug: `server/auth.py`'s `check_scope` once treated Authlete's
+`action:FORBIDDEN` as always meaning insufficient scope, when it doesn't
+distinguish a resource mismatch from a scope mismatch — so this scenario
+briefly returned a misleading `403 insufficient_scope` instead of `401`
+after `check_scope` was introduced, with nobody re-running the full suite
+to notice until it was caught and fixed (see `NOTES.md`, 2026-07-06). If
+this scenario ever comes back `403` instead of `401`, that regression is
+exactly what's happening again.
+
 ### 7. Revocation
 ```bash
 python client/main.py reset
