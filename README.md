@@ -4,7 +4,7 @@ An MCP (Model Context Protocol) resource server and CIMD-based client CLI, imple
 
 ## Evaluation TL;DR
 
-- **Run it** (no setup beyond `pip install`, hits the live deployed services): `python3 client/main.py get-time`
+- **Run it** (after the one-time `venv` + `pip install` setup below, hits the live deployed services — nothing else to start or configure): `python3 client/main.py get-time`
 - **Verify it** — 8 scripted scenarios (happy path, scope differentiation, step-up succeed/exhaust, wrong audience, revocation, expiration), each producing one `RESULT: OK/ERROR` line, no browser or human needed: see [docs/AGENT_TESTING.md](docs/AGENT_TESTING.md).
 - **Read the design reasoning and POV**: [docs/WRITEUP.md](docs/WRITEUP.md).
 
