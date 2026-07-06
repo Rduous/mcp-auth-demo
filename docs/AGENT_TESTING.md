@@ -148,6 +148,34 @@ sleep 12
 python client/main.py probe get-time                                       # expect RESULT: ERROR 401
 ```
 
+### Bonus (not one of the 8): scope enforcement is server-side, not a client-side courtesy
+
+Everything above goes through `client/main.py`'s SDK session. This scenario
+bypasses the client entirely with a raw `curl` — no MCP session handshake,
+no `OAuthClientProvider` — to prove the `403` in Scenario 3 comes from
+`server/scope_gate.py`'s middleware, not from anything the client
+chooses to enforce on its own.
+
+```bash
+python client/main.py reset
+MCP_AUTH_CONSENT=logs:read python client/main.py get-logs   # stage a logs:read-only token
+
+TOKEN=$(python3 -c "import json,pathlib; print(json.loads(pathlib.Path('.mcp_auth_state.json').read_text())['tokens']['access_token'])")
+
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -X POST "https://mcp-auth-server-06y0.onrender.com/mcp" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"get_time","arguments":{}}}'
+```
+
+Expect: `403`, with body `{"error":"insufficient_scope","error_description":"Required scope: mcp:tools"}`.
+Verified live 2026-07-05 against the deployed server with a real
+`logs:read`-only token and no other flags or headers — the request never
+completes an MCP `initialize` handshake, and the middleware still rejects
+it before the request reaches FastMCP's own routing.
+
 ## Pass criteria
 
 All 8 scenarios produce their expected `RESULT:` line. Report any mismatch
