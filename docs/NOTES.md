@@ -191,7 +191,7 @@ Ongoing log of architecture decisions, corrections, and dead ends. A dozen sharp
 - **Headless consent driver** (`MCP_AUTH_CONSENT`/`MCP_AUTH_CONSENT_RETRY`): `_auto_consent()` GETs the consent screen, regexes out every `/authorize/confirm?...` link, decodes each one's `scope` query param and matches it against the env var (or matches the `/authorize/wrong-resource` link by path when the choice is `"wrong-resource"`), then GETs the matching link with `httpx.AsyncClient(follow_redirects=True)` — which lands the resulting 302 straight on our own already-listening loopback callback server, exactly as if a browser had clicked it. `handle_redirect` now checks these env vars first and only falls back to `webbrowser.open` when neither is set, so the real human-demo path is unchanged by default.
 - Both needed for `AGENT_TESTING.md`'s scenarios to actually be agent-drivable end to end rather than needing a human at the consent screen — next step is running all 8 for real against the live deployment.
 
-## 2026-07-05 — Actually running all 8 scenarios found two real bugs
+## 2026-07-05 — Actually running all 8 scenarios found three real bugs
 
 Ran every scenario in `AGENT_TESTING.md` for real against the live Render deployment, playing the agent's role exactly as designed. Worth doing, not a formality — it surfaced two genuine bugs neither manual spot-testing nor code review had caught:
 
