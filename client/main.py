@@ -160,19 +160,50 @@ async def _auto_consent(auth_url: str, choice: str) -> None:
 
 
 async def _preload_oauth_metadata(oauth_auth: OAuthClientProvider, as_url: str) -> None:
-    """Populate the SDK's in-memory AS metadata before the first request,
-    instead of leaving it to be discovered as a side effect of a 401.
+    """Warm the SDK's in-memory AS metadata cache before the first request,
+    as a workaround for a gap in the SDK's own step-up handling -- NOT a
+    substitute for real discovery.
 
-    Each CLI invocation is a fresh process, so a freshly-constructed
-    OAuthClientProvider starts with no discovered metadata even though a
-    still-valid (but under-scoped) token is sitting in FileTokenStorage from
-    an earlier invocation. If that stored token gets attached to the request
-    and the server comes back with a step-up 403 rather than a 401, the SDK
-    never runs PRM/AS discovery at all -- 401 is the only trigger for that --
-    so it falls back to building the authorize URL from the *resource*
-    server's own origin instead of the authorization server's, which 404s.
-    Discovering it upfront here means the 403 branch always has the real
-    authorization_endpoint on hand, 401 or not.
+    The assignment's actual discovery contract still runs untouched: a
+    request with no (or an invalid) token gets a 401, the SDK reads the
+    resource server's WWW-Authenticate header, fetches Protected Resource
+    Metadata, resolves the AS from `authorization_servers[0]`, and fetches
+    *that* AS's own oauth-authorization-server metadata -- all per RFC 9728,
+    with `_validate_resource_match` checking the PRM's `resource` against
+    ours. CIMD then supplies the client_id in that same flow. None of that
+    is bypassed, and if a real 401 does occur, the SDK's own discovery
+    *overwrites* whatever we set here with what it actually discovered.
+
+    What this function papers over is a narrower problem: the SDK's client
+    (mcp/client/auth/oauth2.py) only runs that discovery sequence in the 401
+    branch. Its 403 (insufficient_scope) branch has no discovery step of its
+    own -- it assumes `self.context.oauth_metadata` is already populated
+    from an earlier 401 in the *same* OAuthClientProvider instance, and if
+    it isn't, falls back to guessing an authorize endpoint off the resource
+    server's own URL, which 404s (see NOTES.md's cross-process step-up entry).
+
+    That assumption holds for a long-lived client that keeps one
+    OAuthClientProvider in memory for a whole session. It doesn't hold for
+    us: each `python client/main.py ...` invocation is a fresh process, and
+    we deliberately persist tokens to disk (FileTokenStorage) so a scenario
+    can stage a token in one invocation and reuse it in the next (needed for
+    `probe`, revocation, expiration). A fresh process can attach a
+    still-valid-but-under-scoped stored token to its first request and get a
+    403 with no 401 ever occurring in that process, hitting the SDK's gap.
+
+    This is scoped as narrowly as possible: it hardcodes the same as_url
+    this file already treats as known out-of-band (PROD_AS_URL/LOCAL_AS_URL,
+    also used by revoke_token() and --local) rather than inventing new
+    trust, and it only ever affects the no-401-in-this-process case -- real
+    discovery, when it runs, always wins. A more spec-purist alternative
+    would be to persist the AS metadata *discovered* by a real 401 into
+    FileTokenStorage (same way the token itself is persisted) and rehydrate
+    it here instead of re-deriving it from our own constant -- that would
+    make this cache-of-a-discovery rather than an assumption. Not done here
+    because it adds a second piece of cross-process state for a gap that,
+    per RFC 9728, a compliant client isn't supposed to hit in the first
+    place (the spec doesn't anticipate discovery state resetting between a
+    401 and a later 403 for the same logical session).
     """
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.get(f"{as_url}/.well-known/oauth-authorization-server")
