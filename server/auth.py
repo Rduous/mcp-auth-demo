@@ -68,16 +68,22 @@ class AuthleteTokenVerifier(TokenVerifier):
         data = response.json()
 
         action = data.get("action")
-        if action == "FORBIDDEN":
-            return ScopeCheckResult.INSUFFICIENT
-        if action != "OK":
+        if action not in ("OK", "FORBIDDEN"):
             return ScopeCheckResult.INVALID
 
-        # Same defense-in-depth as verify_token: don't trust Authlete's own
-        # resource check as the only line of defense.
+        # Authlete's `action:FORBIDDEN` doesn't say *why* -- a resource
+        # mismatch and a scope mismatch both come back identically. Check
+        # the resource ourselves first, since accessTokenResources is
+        # present in the response either way. Otherwise a wrong-audience
+        # token gets mislabeled INSUFFICIENT (-> 403 insufficient_scope)
+        # when the real problem has nothing to do with scope -- confirmed
+        # live against prod; see NOTES.md.
         resources = data.get("accessTokenResources") or []
         if RESOURCE_URI not in resources:
             return ScopeCheckResult.INVALID
+
+        if action == "FORBIDDEN":
+            return ScopeCheckResult.INSUFFICIENT
 
         scopes = data.get("scopes") or []
         if required_scope not in scopes:
