@@ -4,8 +4,10 @@ An MCP (Model Context Protocol) resource server and CIMD-based client CLI, imple
 
 ## Evaluation TL;DR
 
+- **Requires Python 3** (`python3` on your `PATH`) — nothing else needs installing up front.
 - **Run it** (after the one-time `venv` + `pip install` setup below, hits the live deployed services — nothing else to start or configure): `python3 client/main.py get-time`
-- **Verify it** — 8 scripted scenarios (happy path, scope differentiation, step-up succeed/exhaust, wrong audience, revocation, expiration), each producing one `RESULT: OK/ERROR` line, no browser or human needed: see [docs/AGENT_TESTING.md](docs/AGENT_TESTING.md).
+- **Expect a browser tab to open** for the OAuth consent screen — that's the auth flow working, not an error. Approve the scope shown and return to the terminal.
+- **Verify it** — 9 scripted scenarios (happy path, scope differentiation, step-up succeed/exhaust/cross-process, wrong audience, revocation, expiration), each producing one `RESULT: OK/ERROR` line, no browser or human needed: see [docs/AGENT_TESTING.md](docs/AGENT_TESTING.md).
 - **Read the design reasoning and POV**: [docs/WRITEUP.md](docs/WRITEUP.md).
 
 ## Layout
@@ -24,7 +26,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-`server` and `authserver` both need `AUTHLETE_SERVICE_ID` and `AUTHLETE_SAT` in their environment (an Authlete service's credentials — not committed anywhere in this repo).
+That's everything needed to run the client against the live deployed services (see below) — `AUTHLETE_SERVICE_ID` / `AUTHLETE_SAT` are **only** needed if you're running `server`/`authserver` yourself locally (see "Running the servers locally" below); the client never touches them.
 
 ## Just running the client
 

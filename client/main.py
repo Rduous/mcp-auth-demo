@@ -13,7 +13,12 @@ import httpx
 from mcp import ClientSession
 from mcp.client.auth import OAuthClientProvider, TokenStorage
 from mcp.client.streamable_http import streamablehttp_client
-from mcp.shared.auth import OAuthClientInformationFull, OAuthClientMetadata, OAuthToken
+from mcp.shared.auth import (
+    OAuthClientInformationFull,
+    OAuthClientMetadata,
+    OAuthMetadata,
+    OAuthToken,
+)
 
 # Production is the default -- this client's real audience is an evaluator (or
 # an agent acting on their behalf) who only ever runs this file, with no
@@ -24,6 +29,13 @@ LOCAL_SERVER_URL = "http://127.0.0.1:8000/mcp"
 PROD_AS_URL = "https://mcp-auth-authserver.onrender.com"
 LOCAL_AS_URL = "http://127.0.0.1:8001"
 CIMD_URL = "https://rduous.github.io/mcp-auth-demo/cimd/client-metadata.json"
+
+# Raw OAuth scope names aren't self-explanatory to someone watching the CLI
+# output -- shown alongside the tool they unlock instead (see handle_redirect).
+SCOPE_LABELS = {
+    "mcp:tools": "get-time",
+    "logs:read": "read-logs",
+}
 
 # Persisted across separate CLI invocations (not just within one process) --
 # needed so a scenario can stage a token in one command (get-time) and
@@ -147,15 +159,50 @@ async def _auto_consent(auth_url: str, choice: str) -> None:
     task.add_done_callback(_background_tasks.discard)
 
 
-async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
+async def _preload_oauth_metadata(oauth_auth: OAuthClientProvider, as_url: str) -> None:
+    """Populate the SDK's in-memory AS metadata before the first request,
+    instead of leaving it to be discovered as a side effect of a 401.
+
+    Each CLI invocation is a fresh process, so a freshly-constructed
+    OAuthClientProvider starts with no discovered metadata even though a
+    still-valid (but under-scoped) token is sitting in FileTokenStorage from
+    an earlier invocation. If that stored token gets attached to the request
+    and the server comes back with a step-up 403 rather than a 401, the SDK
+    never runs PRM/AS discovery at all -- 401 is the only trigger for that --
+    so it falls back to building the authorize URL from the *resource*
+    server's own origin instead of the authorization server's, which 404s.
+    Discovering it upfront here means the 403 branch always has the real
+    authorization_endpoint on hand, 401 or not.
+    """
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(f"{as_url}/.well-known/oauth-authorization-server")
+        response.raise_for_status()
+    oauth_auth.context.oauth_metadata = OAuthMetadata.model_validate(response.json())
+    oauth_auth.context.auth_server_url = as_url
+
+
+async def call_tool(tool_name: str, arguments: dict, server_url: str, as_url: str) -> str:
     attempt_count = 0
 
     async def handle_redirect(auth_url: str) -> None:
         nonlocal attempt_count
         attempt_count += 1
-        scope = parse_qs(urlparse(auth_url).query).get("scope", ["(none)"])[0]
+        scopes = parse_qs(urlparse(auth_url).query).get("scope", [""])[0].split()
+        labeled = [f"{SCOPE_LABELS.get(s, s)} ({s})" for s in scopes]
         label = "Step-up re-authorization" if attempt_count > 1 else "Authorization"
-        print(f"{label} (attempt {attempt_count}) -- requesting scope: {scope}")
+
+        if len(labeled) <= 1:
+            # A single requested scope means the SDK already knows exactly
+            # what this call needs (a tool-specific 403 step-up, not the
+            # scope-agnostic first-ever 401 -- see the note above on why
+            # that one asks for everything the AS advertises).
+            what = labeled[0] if labeled else "(none)"
+            print(f"{label} (attempt {attempt_count}) -- authorize for {what}")
+        else:
+            print(
+                f"{label} (attempt {attempt_count}) -- requesting auth for possible "
+                f"scopes: {', '.join(labeled)} (only one may be needed for this call)"
+            )
 
         choice = os.environ.get("MCP_AUTH_CONSENT")
         if attempt_count > 1:
@@ -164,6 +211,7 @@ async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
         if choice:
             await _auto_consent(auth_url, choice)
         else:
+            print("You need to authenticate -- check your browser window (opened automatically).")
             webbrowser.open(auth_url)
 
     # Loopback server on an OS-assigned ephemeral port. Our CIMD doc only
@@ -199,6 +247,8 @@ async def call_tool(tool_name: str, arguments: dict, server_url: str) -> str:
         callback_handler=handle_callback,
         client_metadata_url=CIMD_URL,
     )
+
+    await _preload_oauth_metadata(oauth_auth, as_url)
 
     async with streamablehttp_client(server_url, auth=oauth_auth) as (read, write, _):
         async with ClientSession(read, write) as session:
@@ -298,7 +348,7 @@ def cli(ctx, local):
 @click.pass_context
 def get_time_cmd(ctx):
     """Tell me the time."""
-    _run(call_tool("get_time", {}, ctx.obj["server_url"]))
+    _run(call_tool("get_time", {}, ctx.obj["server_url"], ctx.obj["as_url"]))
 
 
 @cli.command("get-logs")
@@ -307,7 +357,7 @@ def get_time_cmd(ctx):
 def get_logs_cmd(ctx, topic):
     """Tell me more about [topic] -- reads the project's detailed work log."""
     arguments = {"topic": topic} if topic else {}
-    _run(call_tool("get_logs", arguments, ctx.obj["server_url"]))
+    _run(call_tool("get_logs", arguments, ctx.obj["server_url"], ctx.obj["as_url"]))
 
 
 @cli.command("probe")

@@ -148,7 +148,26 @@ sleep 12
 python client/main.py probe get-time                                       # expect RESULT: ERROR 401
 ```
 
-### Bonus (not one of the 8): scope enforcement is server-side, not a client-side courtesy
+### 9. Cross-process step-up
+```bash
+python client/main.py reset
+MCP_AUTH_CONSENT=logs:read python client/main.py get-logs   # stage a logs:read-only token, process exits
+MCP_AUTH_CONSENT=mcp:tools python client/main.py get-time   # separate process, must still step up correctly
+```
+Expect: both commands print `RESULT: OK ...`. This differs from Scenario 4
+(step-up succeeds): there, the 401-then-403 sequence happens inside one
+`client/main.py` process, so the SDK already has the authorization server's
+metadata cached in memory by the time it hits the 403. Here the second
+command starts as a brand-new process with a *valid* (just under-scoped)
+token already on disk from the first — it goes straight to a 403 with no
+prior 401 in this process to trigger discovery. Confirmed as a real,
+previously-undetected bug (the SDK's step-up path fell back to building the
+authorize URL against the resource server's own origin instead of the
+authorization server's, producing a 404) and fixed by having `client/main.py`
+preload the AS's metadata itself before the first request, regardless of
+which status code eventually triggers a redirect.
+
+### Bonus (not one of the 9): scope enforcement is server-side, not a client-side courtesy
 
 Everything above goes through `client/main.py`'s SDK session. This scenario
 bypasses the client entirely with a raw `curl` — no MCP session handshake,
@@ -178,7 +197,7 @@ it before the request reaches FastMCP's own routing.
 
 ## Pass criteria
 
-All 8 scenarios produce their expected `RESULT:` line. Report any mismatch
+All 9 scenarios produce their expected `RESULT:` line. Report any mismatch
 with the actual line seen — don't editorialize about *why* it might have
 failed unless it's directly observable from stdout.
 
