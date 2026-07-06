@@ -97,6 +97,7 @@ Detailed ELI5 step-by-step plan (Docker, Render Blueprint, credential handling, 
 
 ---
 
+<a name="phase-8"></a>
 ## Phase 8 — Real sign-in: Google SSO + allow-list (nice-to-have, refines Phase 3's no-op)
 
 - [ ] AS-frontend's `/authorize` becomes a Google OAuth client itself — redirect to Google, get a verified email back, use it as the `subject` passed to Authlete instead of the hardcoded demo value
